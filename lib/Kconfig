@@ -853,6 +853,8 @@ config SPL_BZIP2
 	help
 	  This enables support for bzip2 compression algorithm for SPL boot.
 
+source lib/msgpack/Kconfig
+
 config SPL_LZ4
 	bool "Enable LZ4 decompression support in SPL"
 	depends on SPL
