@@ -1,0 +1,17 @@
+if TARGET_IMX8MP_SP2
+
+config SYS_BOARD
+	default "sp2imx8mp"
+
+config SYS_VENDOR
+	default "adlink"
+
+config SYS_CONFIG_NAME
+	default "sp2imx8mp"
+
+config IMX_CONFIG
+	default "board/adlink/sp2imx8mp/imximage-8mp-lpddr4.cfg"
+
+source "board/freescale/common/Kconfig"
+
+endif
