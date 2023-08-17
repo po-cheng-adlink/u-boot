@@ -10,8 +10,12 @@
 #ifndef MSGPACK_SYSDEP_H
 #define MSGPACK_SYSDEP_H
 
+/* Configure for U-Boot environment */
+#define _KERNEL_MODE
+
 #include <stdlib.h>
 #include <stddef.h>
+#include <net.h>
 
 #ifndef MSGPACK_ENDIAN_BIG_BYTE
 #define MSGPACK_ENDIAN_BIG_BYTE 0
@@ -100,11 +104,18 @@
 
 #elif defined(unix) || defined(__unix) || defined(__APPLE__) || defined(__OpenBSD__)
 
+#if !defined(_KERNEL_MODE)
 #include <arpa/inet.h>  /* __BYTE_ORDER */
 #   if defined(linux)
 #       include <byteswap.h>
 #   endif
-
+#else
+#include <common.h>
+#   if defined(linux)
+#      include <linux/compiler.h>
+#      include <asm/unaligned.h>
+#   endif
+#endif
 #endif
 
 #if !defined(MSGPACK_ENDIAN_LITTLE_BYTE) && !defined(MSGPACK_ENDIAN_BIG_BYTE)

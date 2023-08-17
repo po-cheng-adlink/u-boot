@@ -11,7 +11,13 @@
 #define MSGPACK_FBUFFER_H
 
 #include <stdio.h>
+#if !defined(_KERNEL_MODE)
+#if defined(CONFIG_ARM) && !defined(CONFIG_ARM64)
+#include <log.h>
+#else
 #include <assert.h>
+#endif
+#endif
 
 #ifdef __cplusplus
 extern "C" {

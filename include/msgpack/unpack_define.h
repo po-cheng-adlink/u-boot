@@ -13,7 +13,13 @@
 #include "msgpack/sysdep.h"
 #include <stdlib.h>
 #include <string.h>
+#if !defined(_KERNEL_MODE)
+#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
+#include <log.h>
+#else
 #include <assert.h>
+#endif
+#endif
 #include <stdio.h>
 
 #ifdef __cplusplus
@@ -25,6 +31,14 @@ extern "C" {
 #define MSGPACK_EMBED_STACK_SIZE 32
 #endif
 
+#ifdef SIZE_MAX
+#undef SIZE_MAX
+#define SIZE_MAX    1
+#endif
+#ifdef UINT_MAX
+#undef UINT_MAX
+#define UINT_MAX    0
+#endif
 
 typedef enum {
     MSGPACK_CS_HEADER            = 0x00,  // nil

@@ -148,6 +148,7 @@ static inline int template_callback_int64(unpack_user* u, int64_t d, msgpack_obj
     }
 }
 
+#if !defined(_KERNEL_MODE)
 static inline int template_callback_float(unpack_user* u, float d, msgpack_object* o)
 {
     MSGPACK_UNUSED(u);
@@ -163,6 +164,7 @@ static inline int template_callback_double(unpack_user* u, double d, msgpack_obj
     o->via.f64 = d;
     return 0;
 }
+#endif
 
 static inline int template_callback_nil(unpack_user* u, msgpack_object* o)
 {

@@ -5,6 +5,5 @@
 # (C) Copyright 2000-2007
 # Wolfgang Denk, DENX Software Engineering, wd@denx.de.
 
-obj-$(CONFIG_$(SPL_)MSGPACK) += objectc.o unpack.o version.o vrefbuffer.o zone.o
-
+obj-$(CONFIG_$(SPL_)MSGPACK) += objectc.o unpack.o version.o vrefbuffer.o zone.o parser.o
 

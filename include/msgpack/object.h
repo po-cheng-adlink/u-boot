@@ -11,12 +11,17 @@
 #define MSGPACK_OBJECT_H
 
 #include "zone.h"
-#include <stdio.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+#if !defined(_KERNEL_MODE)
+# include <stdio.h>
+# define FILEPTR FILE*
+#else
+# define FILEPTR int
+#endif
 
 /**
  * @defgroup msgpack_object Dynamically typed object
@@ -99,7 +104,7 @@ typedef struct msgpack_object_kv {
 
 #if !defined(_KERNEL_MODE)
 MSGPACK_DLLEXPORT
-void msgpack_object_print(FILE* out, msgpack_object o);
+void msgpack_object_print(FILEPTR out, msgpack_object o);
 #endif
 
 MSGPACK_DLLEXPORT
