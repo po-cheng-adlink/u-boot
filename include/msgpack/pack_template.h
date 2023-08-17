@@ -658,7 +658,7 @@ if(sizeof(unsigned long long) == 2) {
 /*
  * Float
  */
-
+#if !defined(_KERNEL_MODE)
 msgpack_pack_inline_func(_float)(msgpack_pack_user x, float d)
 {
     unsigned char buf[5];
@@ -683,7 +683,7 @@ msgpack_pack_inline_func(_double)(msgpack_pack_user x, double d)
     _msgpack_store64(&buf[1], mem.i);
     msgpack_pack_append_buffer(x, buf, 9);
 }
-
+#endif
 
 /*
  * Nil

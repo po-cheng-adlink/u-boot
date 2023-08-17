@@ -7,6 +7,7 @@
  *    (See accompanying file LICENSE_1_0.txt or copy at
  *    http://www.boost.org/LICENSE_1_0.txt)
  */
+/* u-boot should behave the same way as kernel mode */
 #if defined(_KERNEL_MODE)
 #  undef  _NO_CRT_STDIO_INLINE
 #  define _NO_CRT_STDIO_INLINE
@@ -16,7 +17,6 @@
 #include "msgpack/pack.h"
 #include <ctype.h>
 
-#include <stdio.h>
 #include <string.h>
 
 #if defined(_MSC_VER)
@@ -32,8 +32,17 @@
 #endif
 
 #if defined(_KERNEL_MODE)
+#if !(defined(CONFIG_ARM) || defined(CONFIG_ARM64))
 #  undef  snprintf
 #  define snprintf _snprintf
+#endif
+#endif
+
+#if !defined(_KERNEL_MODE)
+# include <stdio.h>
+# define FILEPTR FILE*
+#else
+# define FILEPTR int
 #endif
 
 int msgpack_pack_object(msgpack_packer* pk, msgpack_object d)
@@ -55,11 +64,13 @@ int msgpack_pack_object(msgpack_packer* pk, msgpack_object d)
     case MSGPACK_OBJECT_NEGATIVE_INTEGER:
         return msgpack_pack_int64(pk, d.via.i64);
 
+#if !defined(_KERNEL_MODE)
     case MSGPACK_OBJECT_FLOAT32:
         return msgpack_pack_float(pk, (float)d.via.f64);
 
     case MSGPACK_OBJECT_FLOAT64:
         return msgpack_pack_double(pk, d.via.f64);
+#endif
 
     case MSGPACK_OBJECT_STR:
         {
@@ -127,21 +138,21 @@ int msgpack_pack_object(msgpack_packer* pk, msgpack_object d)
 
 #if !defined(_KERNEL_MODE)
 
-static void msgpack_object_bin_print(FILE* out, const char *ptr, size_t size)
+static void msgpack_object_bin_print(FILEPTR out, const char *ptr, size_t size)
 {
     size_t i;
     for (i = 0; i < size; ++i) {
         if (ptr[i] == '"') {
-            fputs("\\\"", out);
+            fputs(out, "\\\"");
         } else if (isprint((unsigned char)ptr[i])) {
-            fputc(ptr[i], out);
+            fputc(out, ptr[i]);
         } else {
             fprintf(out, "\\x%02x", (unsigned char)ptr[i]);
         }
     }
 }
 
-void msgpack_object_print(FILE* out, msgpack_object o)
+void msgpack_object_print(FILEPTR out, msgpack_object o)
 {
     switch(o.type) {
     case MSGPACK_OBJECT_NIL:
@@ -183,7 +194,12 @@ void msgpack_object_print(FILE* out, msgpack_object o)
 
     case MSGPACK_OBJECT_STR:
         fprintf(out, "\"");
+        /* rewrite
         fwrite(o.via.str.ptr, o.via.str.size, 1, out);
+        */
+        for (size_t i = 0; i < o.via.str.size; i++) {
+            fprintf(out, "%c", *((char*)(o.via.str.ptr)+i));
+        }
         fprintf(out, "\"");
         break;
 
@@ -324,10 +340,12 @@ int msgpack_object_print_buffer(char *buffer, size_t buffer_size, msgpack_object
 #endif
         break;
 
+#if !defined(_KERNEL_MODE)
     case MSGPACK_OBJECT_FLOAT32:
     case MSGPACK_OBJECT_FLOAT64:
         MSGPACK_CHECKED_CALL(ret, snprintf, aux_buffer, aux_buffer_size, "%f", o.via.f64);
         break;
+#endif
 
     case MSGPACK_OBJECT_STR:
         MSGPACK_CHECKED_CALL(ret, snprintf, aux_buffer, aux_buffer_size, "\"");
@@ -423,9 +441,11 @@ bool msgpack_object_equal(const msgpack_object x, const msgpack_object y)
     case MSGPACK_OBJECT_NEGATIVE_INTEGER:
         return x.via.i64 == y.via.i64;
 
+#if !defined(_KERNEL_MODE)
     case MSGPACK_OBJECT_FLOAT32:
     case MSGPACK_OBJECT_FLOAT64:
         return x.via.f64 == y.via.f64;
+#endif
 
     case MSGPACK_OBJECT_STR:
         return x.via.str.size == y.via.str.size &&

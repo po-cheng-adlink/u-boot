@@ -13,7 +13,13 @@
 #include "sysdep.h"
 #include <stdlib.h>
 #include <string.h>
+#if !defined(_KERNEL_MODE)
+#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
+#include <log.h>
+#else
 #include <assert.h>
+#endif
+#endif
 #include <zlib.h>
 
 #ifdef __cplusplus

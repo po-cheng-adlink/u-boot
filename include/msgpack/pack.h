@@ -76,8 +76,10 @@ static int msgpack_pack_fix_int16(msgpack_packer* pk, int16_t d);
 static int msgpack_pack_fix_int32(msgpack_packer* pk, int32_t d);
 static int msgpack_pack_fix_int64(msgpack_packer* pk, int64_t d);
 
+#if !defined(_KERNEL_MODE)
 static int msgpack_pack_float(msgpack_packer* pk, float d);
 static int msgpack_pack_double(msgpack_packer* pk, double d);
+#endif
 
 static int msgpack_pack_nil(msgpack_packer* pk);
 static int msgpack_pack_true(msgpack_packer* pk);

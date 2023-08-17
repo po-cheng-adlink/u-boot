@@ -39,8 +39,12 @@
 #endif
 
 #if defined(_KERNEL_MODE)
+#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
+#include <log.h>
+#else
 #undef  assert
 #define assert NT_ASSERT
+#endif
 #endif
 
 msgpack_unpack_struct_decl(_stack) {
@@ -192,8 +196,10 @@ msgpack_unpack_func(int, _execute)(msgpack_unpack_struct(_context)* ctx, const c
                     case 0xc8: // ext 16
                     case 0xc9: // ext 32
                         again_fixed_trail(NEXT_CS(p), 1 << ((((unsigned int)*p) + 1) & 0x03));
+#if !defined(_KERNEL_MODE)
                     case 0xca:  // float
                     case 0xcb:  // double
+#endif
                     case 0xcc:  // unsigned int  8
                     case 0xcd:  // unsigned int 16
                     case 0xce:  // unsigned int 32
@@ -249,6 +255,7 @@ msgpack_unpack_func(int, _execute)(msgpack_unpack_struct(_context)* ctx, const c
                 switch(cs) {
                 //case MSGPACK_CS_
                 //case MSGPACK_CS_
+#if !defined(_KERNEL_MODE)
                 case MSGPACK_CS_FLOAT: {
                         union { uint32_t i; float f; } mem;
                         _msgpack_load32(uint32_t, n, &mem.i);
@@ -263,6 +270,7 @@ msgpack_unpack_func(int, _execute)(msgpack_unpack_struct(_context)* ctx, const c
                         mem.i = (mem.i & 0xFFFFFFFFUL) << 32UL | (mem.i >> 32UL);
 #endif
                         push_fixed_value(_double, mem.f); }
+#endif
                 case MSGPACK_CS_UINT_8:
                     push_fixed_value(_uint8, *(uint8_t*)n);
                 case MSGPACK_CS_UINT_16:{

@@ -12,9 +12,15 @@
 
 #include "zone.h"
 #include <stdlib.h>
+#if !defined(_KERNEL_MODE)
+#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
+#include <log.h>
+#else
 #include <assert.h>
+#endif
+#endif
 
-#if defined(unix) || defined(__unix) || defined(__linux__) || defined(__APPLE__) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__QNX__) || defined(__QNXTO__) || defined(__HAIKU__)
+#if !defined(_KERNEL_MODE) && (defined(unix) || defined(__unix) || defined(__linux__) || defined(__APPLE__) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__QNX__) || defined(__QNXTO__) || defined(__HAIKU__))
 #include <sys/uio.h>
 typedef struct iovec msgpack_iovec;
 #else
