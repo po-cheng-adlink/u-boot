@@ -644,6 +644,8 @@ config ZSTD
 	help
 	  This enables Zstandard decompression library.
 
+source lib/msgpack/Kconfig
+
 config SPL_LZ4
 	bool "Enable LZ4 decompression support in SPL"
 	help
