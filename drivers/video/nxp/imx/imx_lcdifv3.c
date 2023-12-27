@@ -17,7 +17,6 @@
 #include <asm/io.h>
 #include <display.h>
 
-
 #include "../../videomodes.h"
 #include <linux/string.h>
 #include <linux/list.h>
@@ -351,7 +350,7 @@ static int lcdifv3_video_probe(struct udevice *dev)
 
 	lcdifv3_of_parse_thres(dev);
 
-	ret = display_enable(priv->disp_dev, NULL, NULL);
+	ret = display_enable(priv->disp_dev, 0, NULL);
 	if (ret) {
 		debug("%s: Display enable error %d\n", __func__, ret);
 		return ret;

@@ -488,7 +488,7 @@ static void list_videolink(bool current_only)
 		else if (current_only)
 			continue;
 
-		printf("[%c]-Video Link %lu", (match)? '*':' ', index);
+		printf("[%c]-Video Link %lu\n", (match)? '*':' ', index);
 
 		if (match) {
 			struct udevice *video_dev = video_link_get_video_device();
