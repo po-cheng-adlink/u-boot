@@ -10,6 +10,7 @@
 #include <video.h>
 #include <video_bridge.h>
 #include <video_link.h>
+#include <panel.h>
 #include <asm/io.h>
 #include <dm/device-internal.h>
 #include <linux/iopoll.h>
@@ -129,6 +130,8 @@ int imx8mp_ldb_read_timing(struct udevice *dev, struct display_timing *timing)
 {
 	struct imx8mp_ldb_priv *priv = dev_get_priv(dev);
 
+	debug("%s() dev: %s\n", __func__, dev->name);
+
 	if (dev->plat_ == NULL)
 		return -EINVAL;
 
@@ -145,8 +148,7 @@ static int imx8mp_ldb_probe(struct udevice *dev)
 	struct imx8mp_ldb_priv *priv = dev_get_priv(dev);
 	int ret;
 
-	debug("%s\n", __func__);
-	printf("imx8mp_ldb_probe");
+	debug("%s() dev: %s\n", __func__, dev->name);
 
 	if (dev->plat_ == NULL) {
 		priv->regmap = syscon_regmap_lookup_by_phandle(dev, "gpr");
@@ -158,7 +160,7 @@ static int imx8mp_ldb_probe(struct udevice *dev)
 		/* Require to add alias in DTB */
 		priv->ldb_id = dev_seq(dev);
 
-		debug("ldb_id %u\n", priv->ldb_id);
+		debug("%s() ldb_id %u\n", __func__, priv->ldb_id);
 	}else{
 		
 		priv->conn_dev = video_link_get_next_device(dev);
@@ -202,10 +204,7 @@ static int imx8mp_ldb_probe(struct udevice *dev)
 			}
 		}
 	}
-    printf("imx8mp_ldb_probe\n");
-
 	return 0;
-
 }
 
 static int imx8mp_ldb_bind(struct udevice *dev)
@@ -214,7 +213,7 @@ static int imx8mp_ldb_bind(struct udevice *dev)
 	ofnode lvds_ch_node;
 	int ret = 0;
 
-	debug("%s\n", __func__);
+	debug("%s() dev: %s\n", __func__, dev->name);
 	lvds_ch_node = ofnode_find_subnode(dev_ofnode(dev), "lvds-channel@0");
 	if (ofnode_valid(lvds_ch_node)) {
 		ret = device_bind(dev, dev->driver, "lvds-channel@0", (void *)1,
@@ -233,7 +232,8 @@ int imx8mp_ldb_enable(struct udevice *dev, int panel_bpp,
 {
 	struct imx8mp_ldb_priv *priv = dev_get_priv(dev);
 	int ret;
-	debug("%s\n", __func__);
+
+	debug("%s() dev: %s\n", __func__, dev->name);
 
 	if (dev->plat_ == NULL) {
 
