@@ -77,6 +77,8 @@ struct imx8mp_ldb_priv {
 	struct clk *ldb_root_clk;
 	struct clk *apb_root_clk;
 	struct display_timing timings;
+	unsigned int data_mapping; /* CH0_BIT_MAPPING_JEIDA or CH0_BIT_MAPPING_SPWG */
+	unsigned int data_width; /* 24 or 32 */
 };
 
 
@@ -118,7 +120,7 @@ static int imx8mp_lvds_phy_power_on(struct udevice *dev)
 	val |= BIT(3);
 	media_blk_write(priv, LVDS_CTRL, val);
 
-	media_blk_write(priv, LDB_CTRL, LDB_CH0_MODE_EN_TO_DI0 | CH0_DATA_WIDTH_24BIT | CH0_BIT_MAPPING_JEIDA);
+	media_blk_write(priv, LDB_CTRL, LDB_CH0_MODE_EN_TO_DI0 | CH0_DATA_WIDTH_24BIT | priv->data_mapping);
  
 	usleep_range(5, 10);
 	
@@ -143,6 +145,21 @@ int imx8mp_ldb_read_timing(struct udevice *dev, struct display_timing *timing)
 	return -EINVAL;
 }
 
+static int of_get_data_mapping(struct udevice *dev)
+{
+    const char *bm;
+
+    bm = dev_read_string(dev, "fsl,data-mapping");
+    if (bm == NULL)
+        return -EINVAL;
+	else if (!strcasecmp(bm, "spwg"))
+		return CH0_BIT_MAPPING_SPWG;
+	else if (!strcasecmp(bm, "jeida"))
+		return CH0_BIT_MAPPING_JEIDA;
+
+    return -EINVAL;
+}
+
 static int imx8mp_ldb_probe(struct udevice *dev)
 {
 	struct imx8mp_ldb_priv *priv = dev_get_priv(dev);
@@ -162,7 +179,20 @@ static int imx8mp_ldb_probe(struct udevice *dev)
 
 		debug("%s() ldb_id %u\n", __func__, priv->ldb_id);
 	}else{
-		
+
+		if (!strcasecmp(dev->name, "lvds-channel@0")) {
+		ret = dev_read_u32(dev, "fsl,data-width", &priv->data_width);
+			if (ret || (priv->data_width != 18 && priv->data_width != 24)) {
+				debug("data width not set or invalid, force default to 24\n");
+				priv->data_width = 24;
+			}
+			priv->data_mapping = of_get_data_mapping(dev);
+			if (priv->data_mapping < 0) {
+				debug("data map not set or invalid, force default to spwg\n");
+				priv->data_mapping = CH0_BIT_MAPPING_SPWG;
+			}
+		}
+
 		priv->conn_dev = video_link_get_next_device(dev);
 		if (!priv->conn_dev) {
 			debug("can't find next device in video link\n");
@@ -173,7 +203,7 @@ static int imx8mp_ldb_probe(struct udevice *dev)
 			debug("decode display timing error %d\n", ret);
 			return ret;
 		}
-		
+
 		if(priv->conn_dev && device_get_uclass_id(priv->conn_dev) == UCLASS_PANEL){
 			ret = panel_enable_backlight(priv->conn_dev);
 			if (ret) {
