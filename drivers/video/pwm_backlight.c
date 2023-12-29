@@ -186,6 +186,11 @@ static int pwm_backlight_set_brightness(struct udevice *dev, int percent)
 			return log_ret(ret);
 
 		priv->enabled = false;
+	} else {
+		ret = pwm_set_enable(priv->pwm, priv->channel, true);
+		if (ret)
+			return log_ret(ret);
+		priv->enabled = true;
 	}
 
 	return 0;
