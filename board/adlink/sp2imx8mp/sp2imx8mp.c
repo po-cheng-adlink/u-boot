@@ -97,6 +97,22 @@ int board_early_init_f(void)
 	return 0;
 }
 
+#ifdef CONFIG_OF_BOARD_FIXUP
+#ifndef CONFIG_SPL_BUILD
+int board_fix_fdt_extra(void *fdt)
+{
+/*
+	if (is_imx8mp()) {
+		// read eeprom
+		// parse config
+	}
+*/
+
+	return 0;
+}
+#endif
+#endif
+
 #ifdef CONFIG_SPLASH_SOURCE
 static struct splash_location sp2imx8mp_splash_sdcard[] = {
 	{

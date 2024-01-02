@@ -1440,11 +1440,17 @@ usb_modify_speed:
 
 #ifdef CONFIG_OF_BOARD_FIXUP
 #ifndef CONFIG_SPL_BUILD
+
+__weak int board_fix_fdt_extra(void *fdt) {
+	return 0;
+}
+
 int board_fix_fdt(void *fdt)
 {
+	int ret;
 	if (is_imx8mpul()) {
 		int i = 0;
-		int nodeoff, ret;
+		int nodeoff;
 		const char *status = "disabled";
 		static const char * dsi_nodes[] = {
 			"/soc@0/bus@32c00000/mipi_dsi@32e60000",
@@ -1467,7 +1473,9 @@ set_status:
 		}
 	}
 
-	return 0;
+	ret = board_fix_fdt_extra(fdt);
+
+	return ret;
 }
 #endif
 #endif
