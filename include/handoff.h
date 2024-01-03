@@ -10,7 +10,7 @@
 
 #if CONFIG_IS_ENABLED(HANDOFF)
 
-#include <asm/handoff.h>
+#include <asm/arch/handoff.h>
 
 /**
  * struct spl_handoff - information passed from SPL to U-Boot proper
