@@ -2,7 +2,7 @@
 /*
  * Copyright 2019 NXP
  */
-
+#define DEBUG
 #include <common.h>
 #include <efi_loader.h>
 #include <env.h>
@@ -31,11 +31,13 @@
 #include <linux/arm-smccc.h>
 #include <mmc.h>
 #include <splash.h>
+#include <msgpack/sbuffer.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
 #define UART_PAD_CTRL	(PAD_CTL_DSE6 | PAD_CTL_FSEL1)
 #define WDOG_PAD_CTRL	(PAD_CTL_DSE6 | PAD_CTL_ODE | PAD_CTL_PUE | PAD_CTL_PE)
+#define I2C_PAD_CTRL	(PAD_CTL_DSE6 | PAD_CTL_HYS | PAD_CTL_PUE)
 
 static iomux_v3_cfg_t const uart_pads[] = {
 	MX8MP_PAD_UART2_RXD__UART2_DCE_RX | MUX_PAD_CTRL(UART_PAD_CTRL),
@@ -44,6 +46,11 @@ static iomux_v3_cfg_t const uart_pads[] = {
 
 static iomux_v3_cfg_t const wdog_pads[] = {
 	MX8MP_PAD_GPIO1_IO02__WDOG1_WDOG_B  | MUX_PAD_CTRL(WDOG_PAD_CTRL),
+};
+
+static iomux_v3_cfg_t const i2c2_pads[] = {
+	MX8MP_PAD_I2C2_SCL__I2C2_SCL | MUX_PAD_CTRL(I2C_PAD_CTRL) | MUX_MODE_SION,
+	MX8MP_PAD_I2C2_SDA__I2C2_SDA | MUX_PAD_CTRL(I2C_PAD_CTRL) | MUX_MODE_SION,
 };
 
 #ifndef CONFIG_SPL_BUILD
@@ -79,6 +86,39 @@ struct efi_capsule_update_info update_info = {
 u8 num_image_type_guids = ARRAY_SIZE(fw_images);
 #endif /* EFI_HAVE_CAPSULE_SUPPORT */
 
+/* Enable Reading EEPROM and msgpack to parse BOM configs */
+extern int parse_eeprom(uint8_t *buffer, char *k, char *v);
+
+int setup_configs(int i2c_bus, int chip, char* disp, char* dispsize) {
+	struct udevice *bus;
+	struct udevice *dev;
+	int ret;
+	char buffer[1024] = {0};
+
+	ret = uclass_get_device_by_seq(UCLASS_I2C, i2c_bus, &bus);
+	if (ret) {
+		printf("%s: Can't find bus\n", __func__);
+		return -EINVAL;
+	}
+	ret = dm_i2c_probe(bus, chip, 0, &dev);
+	if (ret) {
+		printf("%s: Can't find device id=0x%x\n", __func__, chip);
+		return -ENODEV;
+	}
+	ret = dm_i2c_read(dev, 0, buffer, 1024);
+	if (ret) {
+		printf("%s dm_i2c_read failed, err %d\n", __func__, ret);
+		return -EIO;
+	}
+
+	ret = parse_eeprom(buffer, disp, dispsize);
+	if (ret) {
+		return -ENODATA;
+	}
+
+	return 0;
+}
+
 int board_early_init_f(void)
 {
 	struct wdog_regs *wdog = (struct wdog_regs *)WDOG1_BASE_ADDR;
@@ -91,6 +131,8 @@ int board_early_init_f(void)
 
 	init_uart_clk(1);
 
+	imx_iomux_v3_setup_multiple_pads(i2c2_pads, ARRAY_SIZE(i2c2_pads));
+
 #ifndef CONFIG_SPL_BUILD
 	imx_iomux_v3_setup_multiple_pads(fnkey_pads, ARRAY_SIZE(fnkey_pads));
 #endif
@@ -101,12 +143,14 @@ int board_early_init_f(void)
 #ifndef CONFIG_SPL_BUILD
 int board_fix_fdt_extra(void *fdt)
 {
-/*
 	if (is_imx8mp()) {
-		// read eeprom
-		// parse config
+		char key[] = "E_disp";
+		char disp[16] = {0};
+		// parse eeprom for display size
+		setup_configs(1, 0x54, key, disp);
+		debug("%s() arch.sku: %d\n", __func__, gd->spl_handoff->arch.sku);
+		debug("%s() disp: %s\n", __func__, disp);
 	}
-*/
 
 	return 0;
 }
