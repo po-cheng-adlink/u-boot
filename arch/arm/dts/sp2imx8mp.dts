@@ -13,7 +13,7 @@
 	compatible = "fsl,imx8mp-evk", "fsl,imx8mp";
 
 	chosen {
-		bootargs = "console=ttymxc1,115200";
+		bootargs = "console=ttymxc1,115200 earlycon=ec_imx6q,0x30890000,115200";
 		stdout-path = &uart2;
 	};
 
@@ -283,6 +283,11 @@
 	scl-gpios = <&gpio5 16 GPIO_ACTIVE_HIGH>;
 	sda-gpios = <&gpio5 17 GPIO_ACTIVE_HIGH>;
 	status = "okay";
+
+	eeprom: at24@54 {
+		compatible = "atmel,24c02", "i2c-eeprom";
+		reg = <0x54>;
+	};
 };
 
 &i2c3 {
