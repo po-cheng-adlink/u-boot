@@ -46,6 +46,14 @@ static iomux_v3_cfg_t const wdog_pads[] = {
 	MX8MP_PAD_GPIO1_IO02__WDOG1_WDOG_B  | MUX_PAD_CTRL(WDOG_PAD_CTRL),
 };
 
+#ifndef CONFIG_SPL_BUILD
+#define FNKEY_PAD_CTRL	(PAD_CTL_HYS | PAD_CTL_DSE1)
+#define FNKEY_1			IMX_GPIO_NR(1, 7)
+static iomux_v3_cfg_t const fnkey_pads[] = {
+	MX8MP_PAD_GPIO1_IO07__GPIO1_IO07 | MUX_PAD_CTRL(FNKEY_PAD_CTRL), /* FN Key */
+};
+#endif
+
 #ifdef CONFIG_NAND_MXS
 
 static void setup_gpmi_nand(void)
@@ -83,6 +91,9 @@ int board_early_init_f(void)
 
 	init_uart_clk(1);
 
+#ifndef CONFIG_SPL_BUILD
+	imx_iomux_v3_setup_multiple_pads(fnkey_pads, ARRAY_SIZE(fnkey_pads));
+#endif
 	return 0;
 }
 
@@ -546,6 +557,11 @@ int board_init(void)
 	arm_smccc_smc(IMX_SIP_GPC, IMX_SIP_GPC_PM_DOMAIN,
 		      MIPI, true, 0, 0, 0, 0, &res);
 
+#ifndef CONFIG_SPL_BUILD
+	gpio_request(FNKEY_1, "fn_key");
+	gpio_direction_input(FNKEY_1);
+#endif
+
 	return 0;
 }
 
@@ -586,6 +602,9 @@ int board_late_init(void)
 	env_set("board_name", "SP2");
 	env_set("board_rev", "iMX8MP");
 	env_set("boot_device", board_boot_device(get_boot_device()));
+#ifndef CONFIG_SPL_BUILD
+	env_set("fn_key", gpio_get_value(FNKEY_1) ? "no" : "yes");
+#endif
 #endif
 
 	return 0;
