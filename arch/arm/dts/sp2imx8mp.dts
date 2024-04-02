@@ -121,7 +121,54 @@
 		status = "okay";
 	};
 
-	lvds_panel_10: 10inch_panel@0 {
+	dsi_panel_7: dsi-panel@7 {
+		compatible = "ilitek,ili9881c";
+		power-supply = <&reg_bl_pwr>;
+		reset-gpios = <&gpio4 27 GPIO_ACTIVE_LOW>;
+		backlight = <&backlight>;
+		dsi-lanes = <4>;
+		dsi-format = <2>; /* 0: MIPI_DSI_FMT_RGB888, 1: MIPI_DSI_FMT_RGB666, 2: MIPI_DSI_FMT_RGB666_PACKED, 3: MIPI_DSI_FMT_RGB565 */
+		video-mode = <2>; /* 0: burst mode, 1: non-burst mode with sync event, 2: non-burst mode with sync pulse */
+		panel-width-mm = <800>;
+		panel-height-mm = <1280>;
+		status = "disabled";
+
+		port {
+			ili9881c_from_dsim: endpoint {
+				remote-endpoint = <&dsim_to_ili9881c>;
+			};
+		};
+	};
+
+	lvds_panel_7: lvds-panel@7 {
+		compatible = "lvds-panel";
+		backlight = <&backlight>;
+		enable-gpios = <&gpio4 27 GPIO_ACTIVE_HIGH>; /* +VDD_PANEL */
+		status = "disabled";
+
+		display-timings {
+			native-mode = <&timing7>;
+			timing7: timing7 {
+				clock-frequency = <63000000>;
+				hactive = <860>;
+				vactive = <600>;
+				hfront-porch = <160>;
+				hback-porch = <160>;
+				vback-porch = <23>;
+				vfront-porch = <12>;
+				hsync-len = <1>;
+				vsync-len = <1>;
+			};
+		};
+
+		port {
+			lvds_in_1: endpoint {
+				remote-endpoint = <&lvds_out_1>;
+			};
+		};
+	};
+
+	lvds_panel_10: lvds-panel@10 {
 		compatible = "lvds-panel";
 		backlight = <&backlight>;
 		enable-gpios = <&gpio4 27 GPIO_ACTIVE_HIGH>; /* +VDD_PANEL */
@@ -135,7 +182,7 @@
 				vactive = <800>;
 				hfront-porch = <95>;
 				hback-porch = <95>;
-				hsync-len = <40>;
+				hsync-len = <10>;
 				vback-porch = <17>;
 				vfront-porch = <17>;
 				vsync-len = <2>;
@@ -143,8 +190,8 @@
 		};
 
 		port {
-			lvds_in: endpoint {
-				remote-endpoint = <&lvds_out>;
+			lvds_in_2: endpoint {
+				remote-endpoint = <&lvds_out_2>;
 			};
 		};
 	};
@@ -477,7 +524,7 @@
 
 		port {
 			it6263_in: endpoint {
-				remote-endpoint = <&lvds_out>;
+				remote-endpoint = <&lvds_out_1>;
 			};
 		};
 	};
@@ -622,8 +669,15 @@
 		port@1 {
 			reg = <1>;
 
-			lvds_out: endpoint {
-				remote-endpoint = <&lvds_in>;
+			lvds_out_1: endpoint {
+				remote-endpoint = <&lvds_in_1>;
+			};
+		};
+		port@2 {
+			reg = <2>;
+
+			lvds_out_2: endpoint {
+				remote-endpoint = <&lvds_in_2>;
 			};
 		};
 	};
@@ -636,17 +690,19 @@
 &mipi_dsi {
 	status = "disabled";
 
-	ports {
-		port@1 {
-			dsim_to_adv7535: endpoint {
-				remote-endpoint = <&adv7535_from_dsim>;
-			};
+	port@1 {
+		dsim_to_adv7535: endpoint {
+			remote-endpoint = <&adv7535_from_dsim>;
 		};
-
-		port@2 {
-			dsim_to_rm67191: endpoint {
-				remote-endpoint = <&rm67191_from_dsim>;
-			};
+	};
+	port@2 {
+		dsim_to_rm67191: endpoint {
+			remote-endpoint = <&rm67191_from_dsim>;
+		};
+	};
+	port@3 {
+		dsim_to_ili9881c: endpoint {
+			remote-endpoint = <&ili9881c_from_dsim>;
 		};
 	};
 };
