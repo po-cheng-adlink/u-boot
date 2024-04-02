@@ -2,7 +2,7 @@
 /*
  * Copyright 2019 NXP
  */
-#define DEBUG
+
 #include <common.h>
 #include <efi_loader.h>
 #include <env.h>
@@ -146,10 +146,44 @@ int board_fix_fdt_extra(void *fdt)
 	if (is_imx8mp()) {
 		char key[] = "E_disp";
 		char disp[16] = {0};
+		int ret;
+		int i = 0;
+		int nodeoff;
+		const char *disabled = "disabled";
+		const char *okay = "okay";
+		static const char * dsi_nodes[] = {
+			"/soc@0/bus@32c00000/mipi_dsi@32e60000",
+			"/dsi-panel@7",
+			"/lvds-panel@7",
+			"/lvds-panel@10",
+		};
+
 		// parse eeprom for display size
 		setup_configs(1, 0x54, key, disp);
 		debug("%s() arch.sku: %d\n", __func__, gd->spl_handoff->arch.sku);
 		debug("%s() disp: %s\n", __func__, disp);
+
+		// update device tree
+		for (i = 0; i < ARRAY_SIZE(dsi_nodes); i++) {
+			nodeoff = fdt_path_offset(fdt, dsi_nodes[i]);
+			if (nodeoff > 0) {
+set_status:
+				if (!strcasecmp(disp, "7d") && ( i == 0 || i == 1)) {
+					ret = fdt_setprop(fdt, nodeoff, "status", okay, strlen(okay) + 1);
+				} else if (!strcasecmp(disp, "7") && ( i == 2 )) {
+					ret = fdt_setprop(fdt, nodeoff, "status", okay, strlen(okay) + 1);
+				} else if (!strcasecmp(disp, "10") && ( i == 3 )) {
+					ret = fdt_setprop(fdt, nodeoff, "status", okay, strlen(okay) + 1);
+				} else {
+					ret = fdt_setprop(fdt, nodeoff, "status", disabled, strlen(disabled) + 1);
+				}
+				if (ret == -FDT_ERR_NOSPACE) {
+					ret = fdt_increase_size(fdt, 512);
+					if (!ret)
+						goto set_status;
+				}
+			}
+		}
 	}
 
 	return 0;
