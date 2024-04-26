@@ -109,14 +109,35 @@ int handoff_arch_save(struct spl_handoff *ho)
 void spl_dram_init(void)
 {
 	struct { int size; struct dram_timing_info *timing; } dram_timing[] = {
+
+#if defined(CONFIG_LPDDR4_2GB) || defined(CONFIG_LPDDR4_ALL)
 		{2, &dram_timing_2G}, /* default */
+#else
+		{2, NULL}, /* point to nothing to keep array index */
+#endif
+#if defined(CONFIG_LPDDR4_4GB) || defined(CONFIG_LPDDR4_ALL)
 		{4, &dram_timing_4G}, /* &dram_timing_lpddr4_4gb, */
+#else
+		{4, NULL}, /* point to nothing to keep array index */
+#endif
+#if defined(CONFIG_LPDDR4_8GB) || defined(CONFIG_LPDDR4_ALL)
 		{8, &dram_timing_8G}, /* &dram_timing_lpddr4_8gb, */
+#else
+		{8, NULL}, /* point to nothing to keep array index */
+#endif
+#if defined(CONFIG_LPDDR4_ALL)
 		{1, &dram_timing_2G}, /* &dram_timing_lpddr4_1gb, */
 		{2, &dram_timing_2G}, /* NULL, default to 2gb */
 		{2, &dram_timing_2G}, /* NULL, default to 2gb */
 		{2, &dram_timing_2G}, /* NULL, default to 2gb */
 		{2, &dram_timing_2G}, /* NULL, default to 2gb */
+#else
+		{1, NULL}, /* point to nothing to keep array index */
+		{2, NULL}, /* point to nothing to keep array index */
+		{2, NULL}, /* point to nothing to keep array index */
+		{2, NULL}, /* point to nothing to keep array index */
+		{2, NULL}, /* point to nothing to keep array index */
+#endif
 	};
 	int dram_sku = get_dram_sku();
 
