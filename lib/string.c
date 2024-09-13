@@ -718,6 +718,42 @@ void *memchr(const void *s, int c, size_t n)
 }
 
 #endif
+
+#ifndef __HAVE_ARCH_MEMMEM
+/**
+ * memmem - Find a sequence in an area of memory
+ * @a: The memory area
+ * @len1: Size of the memory area
+ * @b: The sequence to search for
+ * @len2: Size of the sequence
+ *
+ * returns the address of the first occurrence of @b, or %NULL
+ * if @b is not found
+ */
+void *memmem (const void *m, size_t ml, const void *s, size_t sl)
+{
+	const char * start = m;
+	const char * end = m + ml;
+
+	if (sl > ml)
+		return NULL;
+
+	while (start < end)
+	{
+		size_t len = sl;
+		const char * ptr1 = start;
+		const char * ptr2 = s;
+		while (len > 0 && *ptr1++ == *ptr2++)
+			len--;
+		if (len == 0)
+			return (void *)start;
+		start++;
+	}
+
+	return NULL;
+}
+#endif
+
 #ifndef __HAVE_ARCH_MEMCHR_INV
 static void *check_bytes8(const u8 *start, u8 value, unsigned int bytes)
 {
