@@ -70,7 +70,7 @@ int find_endflag(const char *const buf, size_t maxlen)
 	char* pos = NULL;
 	int msglen = 0;
 
-	pos = strstr (buf, ending);
+	pos = memmem (buf, EEPROM_SIZE, ending, 4);
 	if (pos != NULL)
 		msglen = pos - buf + sizeof(ending);
 
