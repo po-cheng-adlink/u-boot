@@ -13,10 +13,10 @@ DRIVE=/dev/sdX
 #SOC_DIR="iMX8M"
 #DTBS="fsl-imx8mq-evk"
 
-BRANCH_VER="imx_5.4.70_2.3.0" #branch used by imx-mkimage and imx-atf under meta-imx
-MKIMAGE_SRC_GIT_ID='8947fea369ab3932259630232cfb9f87b8f9dda1' #refer to 'imx-mkimage_git.inc' in Yocto
-ATF_SRC_GIT_ID='f1d7187f261ebf4b8a2a70d638d4bfc0a9b26c29' #refer to 'imx-atf_2.2.bb' in Yocto
-DDR_FW_VER="8.12" #refer to the name of 'firmware-imx-8.10.inc'
+BRANCH_VER="lf-5.15.71_2.2.0" #branch used by imx-mkimage and imx-atf under meta-imx
+MKIMAGE_SRC_GIT_ID='3bfcfccb71ddf894be9c402732ccb229fe72099e' #refer to 'imx-mkimage_git.inc' in Yocto
+ATF_SRC_GIT_ID='3c1583ba0a5d11e5116332e91065cb3740153a46' #refer to 'imx-atf_2.2.bb' in Yocto
+DDR_FW_VER="8.18" #refer to the name of 'firmware-imx-8.10.inc'
 
 FSL_MIRROR="https://www.nxp.com/lgfiles/NMG/MAD/YOCTO"
 FIRMWARE_DIR="firmware_imx8"
@@ -100,25 +100,28 @@ install_firmware()
 	fi
 
 	cd ${FIRMWARE_DIR} && FWD=`pwd`
-	
+
 	#Get, build and copy the ARM Trusted Firmware
 	if [ ! -d imx-atf ] ; then
-		git clone https://source.codeaurora.org/external/imx/imx-atf -b ${BRANCH_VER} || printf "Fails to fetch ATF source code \n"
+		git clone https://github.com/nxp-imx/imx-atf.git -b ${BRANCH_VER} || printf "Fails to fetch ATF source code \n"
 		cd imx-atf
 		git checkout ${ATF_SRC_GIT_ID}
 	fi
 
+	PWD=$(pwd)
+	[ -n "${PWD##*imx-atf}" ] && cd imx-atf
+
 	if [ ! -f build/${PLATFORM}/release/bl31.bin ] ; then
 		rm -rf build
 		make PLAT=${PLATFORM} bl31 || printf "Fails to build ATF firmware \n"
-	fi	
+	fi
 	if [ -f build/${PLATFORM}/release/bl31.bin ] ; then
 		printf "Copy build/${PLATFORM}/release/bl31.bin to $MKIMAGE_DIR \n"
 		cp build/${PLATFORM}/release/bl31.bin ${TWD}/${MKIMAGE_DIR}/${SOC_DIR}
 	else
 		printf "Cannot find release/bl31.bin \n"
 	fi
-	
+
 	#Get and copy the DDR and HDMI firmware
 	cd ${FWD}
 	if [ ! -d firmware-imx-${DDR_FW_VER} ] ; then
