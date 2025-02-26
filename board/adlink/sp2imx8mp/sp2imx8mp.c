@@ -550,9 +550,9 @@ int board_late_init(void)
 	env_set("boot_device", board_boot_device(get_boot_device()));
 #ifndef CONFIG_SPL_BUILD
 	env_set("fn_key", gpio_get_value(FNKEY_1) ? "no" : "yes");
+	env_set_ulong("E_ram", gd->spl_handoff->arch.sku);
 #endif
 #endif
-
 	return 0;
 }
 
