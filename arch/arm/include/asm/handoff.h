@@ -17,6 +17,7 @@
 struct arch_spl_handoff {
 	ulong usable_ram_top;
 	uint32_t sku;
+	char buffer[256];
 };
 
 #endif
