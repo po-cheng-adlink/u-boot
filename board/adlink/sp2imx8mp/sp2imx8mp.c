@@ -3,6 +3,7 @@
  * Copyright 2019 NXP
  */
 
+#include <common.h>
 #include <efi_loader.h>
 #include <env.h>
 #include <errno.h>
@@ -82,39 +83,9 @@ struct efi_capsule_update_info update_info = {
 
 #endif /* EFI_HAVE_CAPSULE_SUPPORT */
 
-/* Enable Reading EEPROM and msgpack to parse BOM configs */
-extern int parse_eeprom(uint8_t *buffer, char *k, char *v);
-
-int setup_configs(int i2c_bus, int chip, char* disp, char* dispsize) {
-	struct udevice *bus;
-	struct udevice *dev;
-	int ret;
-	char buffer[1024] = {0};
-
-	ret = uclass_get_device_by_seq(UCLASS_I2C, i2c_bus, &bus);
-	if (ret) {
-		printf("%s: Can't find bus\n", __func__);
-		return -EINVAL;
-	}
-	ret = dm_i2c_probe(bus, chip, 0, &dev);
-	if (ret) {
-		printf("%s: Can't find device id=0x%x\n", __func__, chip);
-		return -ENODEV;
-	}
-	ret = dm_i2c_read(dev, 0, buffer, 1024);
-	if (ret) {
-		printf("%s dm_i2c_read failed, err %d\n", __func__, ret);
-		return -EIO;
-	}
-	ret = parse_eeprom(buffer, disp, dispsize);
-	if (ret) {
-		return -ENODATA;
-	}
-	return 0;
-}
-
 int board_early_init_f(void)
 {
+	printf("%s() start\n", __func__);
 	struct wdog_regs *wdog = (struct wdog_regs *)WDOG1_BASE_ADDR;
 
 	imx_iomux_v3_setup_multiple_pads(wdog_pads, ARRAY_SIZE(wdog_pads));
@@ -132,6 +103,66 @@ int board_early_init_f(void)
 #endif
 	return 0;
 }
+
+#if CONFIG_IS_ENABLED(OF_BOARD_FIXUP)
+/* Enable Reading EEPROM and msgpack to parse BOM configs */
+extern int parse_eeprom(uint8_t *buffer, char *k, char *v);
+int board_fix_fdt_extra(void *fdt)
+{
+	if (is_imx8mp()) {
+		// read eeprom
+		// parse config
+		char key[] = "E_disp";
+		char disp[16] = {0};
+		int ret;
+		int i = 0;
+		int nodeoff;
+		const char *disabled = "disabled";
+		const char *okay = "okay";
+		static const char * dsi_nodes[] = {
+			"/soc@0/bus@32c00000/mipi_dsi@32e60000",
+			"/dsi-panel@7",
+			"/lvds-panel@7",
+			"/lvds-panel@10",
+		};
+
+		// parse eeprom for display size
+		//memcpy (buffer, gd->spl_handoff->arch.buffer, 768);
+		debug("%s() arch.sku: %d\n", __func__, gd->spl_handoff->arch.sku);
+		debug("%s() buffer: %s\n", __func__, gd->spl_handoff->arch.buffer);
+		ret = parse_eeprom(gd->spl_handoff->arch.buffer, key, disp);
+		debug("%s() disp: %s ret=%d\n", __func__, disp, ret);
+
+		// update device tree
+		for (i = 0; i < ARRAY_SIZE(dsi_nodes); i++) {
+			nodeoff = fdt_path_offset(fdt, dsi_nodes[i]);
+			if (nodeoff > 0) {
+set_status:
+				if (!strcasecmp(disp, "7d") && ( i == 0 || i == 1)) {
+					debug("%s() 7d\n", __func__);
+					ret = fdt_setprop(fdt, nodeoff, "status", okay, strlen(okay) + 1);
+				} else if (!strcasecmp(disp, "7") && ( i == 2 )) {
+					debug("%s() 7\n", __func__);
+					ret = fdt_setprop(fdt, nodeoff, "status", okay, strlen(okay) + 1);
+				} else if (!strcasecmp(disp, "10") && ( i == 3 )) {
+					debug("%s() 10\n", __func__);
+					ret = fdt_setprop(fdt, nodeoff, "status", okay, strlen(okay) + 1);
+				} else {
+					debug("%s() disable\n", __func__);
+					ret = fdt_setprop(fdt, nodeoff, "status", disabled, strlen(disabled) + 1);
+				}
+				if (ret == -FDT_ERR_NOSPACE) {
+					debug("%s() increase fdt size\n", __func__);
+					ret = fdt_increase_size(fdt, 512);
+					if (!ret)
+						goto set_status;
+				}
+			}
+		}
+	}
+	return 0;
+}
+#endif
 
 #ifdef CONFIG_SPLASH_SOURCE
 static struct splash_location sp2imx8mp_splash_sdcard[] = {
