@@ -228,7 +228,7 @@ int board_phys_sdram_size(phys_size_t *size)
 int ft_board_setup(void *blob, struct bd_info *bd)
 {
 #ifdef CONFIG_IMX8M_DRAM_INLINE_ECC
-#ifdef CONFIG_TARGET_IMX8MP_DDR4_EVK
+#ifdef CONFIG_TARGET_IMX8MP_SP2
 	int rc;
 	phys_addr_t ecc_start = 0x120000000;
 	size_t ecc_size = 0x20000000;
