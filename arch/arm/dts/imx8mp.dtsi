@@ -1840,12 +1840,16 @@
 		};
 
 		lvds-channel@1 {
+			#address-cells = <1>;
+			#size-cells = <0>;
 			reg = <1>;
 			phys = <&ldb_phy2>;
 			phy-names = "ldb_phy";
 			status = "disabled";
 
-			port {
+			port@0 {
+				reg = <0>;
+
 				ldb_ch1: endpoint {
 					remote-endpoint = <&lcdif2_disp_ldb_ch1>;
 				};

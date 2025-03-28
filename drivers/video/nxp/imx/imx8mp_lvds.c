@@ -46,7 +46,8 @@
 #define PRE_EMPH_EN		BIT(4)
 #define HS_EN			BIT(3)
 #define BG_EN			BIT(2)
-#define CH_EN		    BIT(0)
+#define CH1_EN		    BIT(1)
+#define CH0_EN		    BIT(0)
 
 
 #define LDB_CTRL		0x5c
@@ -59,6 +60,9 @@
 #define CH0_DATA_WIDTH_24BIT		(1 << 5)
 #define CH0_BIT_MAPPING_JEIDA		(1 << 6)
 #define CH0_BIT_MAPPING_SPWG		(0 << 6)
+#define CH1_DATA_WIDTH_24BIT		(1 << 7)
+#define CH1_BIT_MAPPING_JEIDA		(1 << 8)
+#define CH1_BIT_MAPPING_SPWG		(0 << 8)
 #define LDB_REG_CH0_FIFO_RESET		(1 << 11)
 #define LDB_REG_CH1_FIFO_RESET		(1 << 12)
 #define LDB_REG_ASYNC_FIFO_EN		(1 << 24)
@@ -114,13 +118,14 @@ static int imx8mp_lvds_phy_power_on(struct udevice *dev)
 	if (!bg_en){
 		usleep_range(15, 20);
 	}
-		
+
 	val = media_blk_read(priv, LVDS_CTRL);
-	val |= CH_EN;
+	val |= CH1_EN;
 	val |= BIT(3);
 	media_blk_write(priv, LVDS_CTRL, val);
-
-	media_blk_write(priv, LDB_CTRL, LDB_CH0_MODE_EN_TO_DI0 | CH0_DATA_WIDTH_24BIT | priv->data_mapping);
+	debug("%s() set LVDS_CTRL: 0x%x\n", __func__, val);
+	media_blk_write(priv, LDB_CTRL, LDB_CH1_MODE_EN_TO_DI1 | CH1_DATA_WIDTH_24BIT | priv->data_mapping);
+	debug("%s() set LDB_CTRL: 0x%x\n", __func__, LDB_CH1_MODE_EN_TO_DI1 | CH1_DATA_WIDTH_24BIT | priv->data_mapping);
  
 	usleep_range(5, 10);
 	
@@ -180,7 +185,7 @@ static int imx8mp_ldb_probe(struct udevice *dev)
 		debug("%s() ldb_id %u\n", __func__, priv->ldb_id);
 	}else{
 
-		if (!strcasecmp(dev->name, "lvds-channel@0")) {
+		if (!strcasecmp(dev->name, "lvds-channel@1")) {
 		ret = dev_read_u32(dev, "fsl,data-width", &priv->data_width);
 			if (ret || (priv->data_width != 18 && priv->data_width != 24)) {
 				debug("data width not set or invalid, force default to 24\n");
@@ -244,9 +249,9 @@ static int imx8mp_ldb_bind(struct udevice *dev)
 	int ret = 0;
 
 	debug("%s() dev: %s\n", __func__, dev->name);
-	lvds_ch_node = ofnode_find_subnode(dev_ofnode(dev), "lvds-channel@0");
+	lvds_ch_node = ofnode_find_subnode(dev_ofnode(dev), "lvds-channel@1");
 	if (ofnode_valid(lvds_ch_node)) {
-		ret = device_bind(dev, dev->driver, "lvds-channel@0", (void *)1,
+		ret = device_bind(dev, dev->driver, "lvds-channel@1", (void *)1,
 			lvds_ch_node, NULL);
 		if (ret)
 			debug("Error binding driver '%s': %d\n", dev->driver->name,
@@ -266,7 +271,6 @@ int imx8mp_ldb_enable(struct udevice *dev, int panel_bpp,
 	debug("%s() dev: %s\n", __func__, dev->name);
 
 	if (dev->plat_ == NULL) {
-
 		imx8mp_lvds_phy_power_on(dev);
 	} else {
 		display_enable(dev->parent, panel_bpp, &priv->timings);

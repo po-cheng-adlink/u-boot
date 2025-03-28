@@ -598,7 +598,7 @@
 &ldb {
 	status = "okay";
 
-	lvds-channel@0 {
+	lvds-channel@1 {
 		fsl,data-mapping = "jeida";
 		fsl,data-width = <24>;
 		status = "okay";
