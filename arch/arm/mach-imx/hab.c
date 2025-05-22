@@ -332,6 +332,37 @@ static char *ctx_str[] = {
 			  NULL
 };
 
+static char *ctx_cmd_str[] = {
+			  "CMD = HAB_CMD_SET (0xb1)\n",
+			  "CMD = HAB_CMD_INS_KEY (0xbe)\n",
+			  "CMD = HAB_CMD_AUT_DAT (0xca)\n",
+			  "CMD = HAB_CMD_WRT_DAT (0xcc)\n",
+			  "CMD = HAB_CMD_CHK_DAT (0xcf)\n",
+			  "CMD = HAB_CMD_NOP (0xc0)\n",
+			  "CMD = HAB_CMD_INIT (0xb4)\n",
+			  "CMD = HAB_CMD_UNLK (0xb2)\n",
+			  "CMD = INVALID\n",
+			  NULL
+};
+
+static char *ctx_protocol_str[] = {
+			  "PTCL = HAB_PCL_SRK (0x03)\n",
+			  "PTCL = HAB_PCL_X509 (0x09)\n",
+			  "PTCL = HAB_PCL_CMS (0xc5)\n",
+			  "PTCL = HAB_PCL_BLOB (0xbb)\n",
+			  "PTCL = HAB_PCL_AEAD (0xa3)\n",
+			  "PTCL = INVALID\n",
+			  NULL
+};
+
+static char *ctx_key_str[] = {
+			  "SRK\n",
+			  "CSF\n",
+			  "IMAGE\n",
+			  "INVALID\n",
+			  NULL
+};
+
 static uint8_t hab_statuses[5] = {
 	HAB_STS_ANY,
 	HAB_FAILURE,
@@ -399,6 +430,25 @@ static uint8_t hab_engines[16] = {
 	HAB_ENG_SW
 };
 
+static uint8_t hab_ctx_cmd[8] = {
+	HAB_CMD_SET,
+	HAB_CMD_INS_KEY,
+	HAB_CMD_AUT_DAT,
+	HAB_CMD_WRT_DAT,
+	HAB_CMD_CHK_DAT,
+	HAB_CMD_NOP,
+	HAB_CMD_INIT,
+	HAB_CMD_UNLK
+};
+
+static uint8_t hab_protocol[5] = {
+	HAB_PCL_SRK,
+	HAB_PCL_X509,
+	HAB_PCL_CMS,
+	HAB_PCL_BLOB,
+	HAB_PCL_AEAD,
+};
+
 static inline uint32_t get_idx(uint8_t *list, uint8_t tgt, uint32_t size)
 {
 	uint32_t idx = 0;
@@ -410,6 +460,32 @@ static inline uint32_t get_idx(uint8_t *list, uint8_t tgt, uint32_t size)
 		++idx;
 	}
 	return idx;
+}
+
+/* parse extended event data */
+static void process_event_record_extra(uint8_t *event_data, size_t bytes)
+{
+	struct record *rec = (struct record *)event_data;
+	uint8_t ctx = rec->contents[2];
+
+	printf("\nextra event data: ctx(0x%x), (%lu) bytes\n", ctx, bytes);
+	if (ctx == HAB_CTX_COMMAND) {
+		printf("\n%s", ctx_cmd_str[get_idx(hab_ctx_cmd, rec->contents[4], ARRAY_SIZE(hab_ctx_cmd))]);
+		printf("Length = %u\n", ((rec->contents[5] << 8) + rec->contents[6]));
+		printf("Key Index = (%u) %s", rec->contents[8], ctx_key_str[rec->contents[8]]);
+		printf("%s", ctx_protocol_str[get_idx(hab_protocol, rec->contents[9], ARRAY_SIZE(hab_protocol))]);
+		printf("%s", eng_str[get_idx(hab_engines, rec->contents[10], ARRAY_SIZE(hab_engines))]);
+		printf("Signature Offset: 0x%08x\n", ((rec->contents[12] << 24) + (rec->contents[13] << 16) + (rec->contents[14] << 8) + rec->contents[15]));
+		printf("Block Start Addr: 0x%08x\n", ((rec->contents[16] << 24) + (rec->contents[17] << 16) + (rec->contents[18] << 8) + rec->contents[19]));
+		printf("Block Length: 0x%08x\n", ((rec->contents[20] << 24) + (rec->contents[21] << 16) + (rec->contents[22] << 8) + rec->contents[23]));
+	} else if (ctx == HAB_CTX_ASSERT) {
+		printf("\nAddress Event Addr: 0x%08x\n", ((rec->contents[8] << 24) + (rec->contents[9] << 16) + (rec->contents[10] << 8) + rec->contents[11]));
+		printf("Block Length: 0x%08x\n", ((rec->contents[12] << 24) + (rec->contents[13] << 16) + (rec->contents[14] << 8) + rec->contents[15]));
+		if (bytes > 0 && bytes <= 28) {
+			printf("Address Event Addr2: 0x%08x\n", ((rec->contents[16] << 24) + (rec->contents[17] << 16) + (rec->contents[18] << 8) + rec->contents[19]));
+			printf("Block Length2: 0x%08x\n", ((rec->contents[20] << 24) + (rec->contents[21] << 16) + (rec->contents[22] << 8) + rec->contents[24]));
+		}
+	}
 }
 
 static void process_event_record(uint8_t *event_data, size_t bytes)
@@ -443,6 +519,7 @@ static void display_event(uint8_t *event_data, size_t bytes)
 	}
 
 	process_event_record(event_data, bytes);
+	process_event_record_extra(event_data, bytes);
 }
 
 static int get_hab_status(void)

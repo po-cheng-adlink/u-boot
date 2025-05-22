@@ -132,6 +132,25 @@ enum hab_target {
 	HAB_TGT_ANY		= 0x55,
 };
 
+enum hab_ctx_cmd {
+	HAB_CMD_SET = 0xb1,			/* Set */
+	HAB_CMD_INS_KEY = 0xbe,		/* Install Key */
+	HAB_CMD_AUT_DAT = 0xca,		/* Authenticate Data */
+	HAB_CMD_WRT_DAT = 0xcc,		/* Write Data */
+	HAB_CMD_CHK_DAT = 0xcf,		/* Check Data */
+	HAB_CMD_NOP = 0xc0,			/* No Operation */
+	HAB_CMD_INIT = 0xb4,		/* Initialize */
+	HAB_CMD_UNLK = 0xb2,		/* Unlock */
+};
+
+enum hab_protocal {
+	HAB_PCL_SRK  = 0x03,		/* SRK certificate format */
+	HAB_PCL_X509 = 0x09,		/* X.509v3 certificate format */
+	HAB_PCL_CMS  = 0xc5,		/* CMS/PKCS#7 signature format */
+	HAB_PCL_BLOB = 0xbb,		/* SHW-specific wrapped key format */
+	HAB_PCL_AEAD = 0xa3,		/* Proprietary AEAD MAC format */
+};
+
 struct imx_sec_config_fuse_t {
 	int bank;
 	int word;
@@ -216,9 +235,9 @@ typedef void hapi_clock_init_t(void);
 
 #define HAB_TAG_RVT          0xDD  /* ROM Vector Table */
 #define HAB_CMD_HDR          0xD4  /* CSF Header */
-#define HAB_CMD_WRT_DAT      0xCC  /* Write Data command tag */
-#define HAB_CMD_CHK_DAT      0xCF  /* Check Data command tag */
-#define HAB_CMD_SET          0xB1  /* Set command tag */
+//#define HAB_CMD_WRT_DAT      0xCC  /* Write Data command tag */
+//#define HAB_CMD_CHK_DAT      0xCF  /* Check Data command tag */
+//#define HAB_CMD_SET          0xB1  /* Set command tag */
 #define HAB_PAR_MID          0x01  /* MID parameter value */
 
 #define IVT_SIZE			0x20

@@ -5,7 +5,7 @@
  *
  * Author: Tim Harvey <tharvey@gateworks.com>
  */
-
+#define DEBUG
 #include <common.h>
 #include <hang.h>
 #include <init.h>
