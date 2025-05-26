@@ -13,8 +13,10 @@
 
 WORK_DIR=`pwd`
 BUILD_DIR="build_fw_imx8"
+
 DRIVE=/dev/sdX
 OVERLAYS=$(echo ${OVERLAYS} | xargs)
+SECURE_BOOT=false
 
 SPL_ORI="spl/u-boot-spl.bin"
 UBOOT_ORI="u-boot-nodtb.bin"
@@ -36,12 +38,26 @@ MKIMAGE_SRC_COMMIT='3bfcfccb71ddf894be9c402732ccb229fe72099e' #refer to 'imx-mki
 MKIMAGE_DIR="imx-mkimage"
 MKIMAGE_TARGET="flash_hdmi_spl_uboot"
 MKIMAGE_LOG="${WORK_DIR}/${BUILD_DIR}/mkimage-flash.log"
+LOG_PRINT_FIT_HAB="${WORK_DIR}/${BUILD_DIR}/mkimage-hab.log"
 
 DDR_FW_VER="8.18" #refer to the name of 'firmware-imx-8.24.inc'
 DDR_FW_VER_ABBREV=""
 FSL_MIRROR="https://www.nxp.com/lgfiles/NMG/MAD/YOCTO"
 
-
+# Secure HABv4 Boot
+#	file://0001-fix-err-msg-linking.patch
+CST_MIRROR="https://gitlab.apertis.org/pkg/imx-code-signing-tool.git"
+CST_SRC_COMMIT="e2c687a856e6670e753147aacef42d0a3c07891a"
+CST_BRANCH="apertis/v2022pre"
+CST_DIR="imx-cst"
+CST_VER="3.3.1"
+CST_BIN="${WORK_DIR}/${BUILD_DIR}/release/linux64/bin/cst"
+CST_FUSE="${WORK_DIR}/${BUILD_DIR}/release/crts/fuse.bin"
+FUSE_CMD="${WORK_DIR}/${BUILD_DIR}/fuse.bin.cmd"
+CST_CSF_CERT="${WORK_DIR}/${BUILD_DIR}/release/crts/CSF1_1_sha256_2048_65537_v3_usr_crt.pem"
+CST_IMG_CERT="${WORK_DIR}/${BUILD_DIR}/release/crts/IMG1_1_sha256_2048_65537_v3_usr_crt.pem"
+CST_SRK_TABLE="${WORK_DIR}/${BUILD_DIR}/release/crts/table.bin"
+PKI_CRTS_LOG=pki_crt_table_fuse.log
 
 setup_platform()
 {
@@ -284,8 +300,16 @@ generate_imx_boot()
 	cd ${WORK_DIR}/${BUILD_DIR}/${MKIMAGE_DIR}
 
 	printf "\nIssue Command: make SOC=${SOC_TARGET} dtbs=\"${DTBS}\" ovlays=\"${OVERLAYS}\" ${MKIMAGE_TARGET}\n"
-	make SOC=${SOC_TARGET} dtbs="${DTBS}" ovlays="${OVERLAYS}" ${MKIMAGE_TARGET} 2>&1 | tee ${MKIMAGE_FIT_HAB_LOG} && \
+	make SOC=${SOC_TARGET} dtbs="${DTBS}" ovlays="${OVERLAYS}" ${MKIMAGE_TARGET} 2>&1 | tee ${MKIMAGE_LOG} && \
 	printf "Make target: ${MKIMAGE_TARGET} and generate flash.bin... \n" || printf "Fails to generate flash.bin... \n"
+
+	printf "\nIssue Command: make SOC=${SOC_TARGET} dtbs=\"${DTBS}\" ovlays=\"${OVERLAYS}\" print_fit_hab\n"
+	make SOC=${SOC_TARGET} dtbs="${DTBS}" ovlays="${OVERLAYS}" print_fit_hab 2>&1 | tee ${LOG_PRINT_FIT_HAB} && \
+	printf "Make target: print_fit_hab...\n" || printf "Fails to generate fit hab... \n"
+
+	if [ -f ${WORK_DIR}/${BUILD_DIR}/${MKIMAGE_DIR}/${SOC_DIR}/flash.bin ]; then
+		FLASH_IMAGE="${WORK_DIR}/${BUILD_DIR}/${MKIMAGE_DIR}/${SOC_DIR}/flash.bin"
+	fi
 }
 
 flash_imx_boot()
@@ -301,6 +325,78 @@ flash_imx_boot()
 	printf "Flash flash.bin... \n" || printf "Fails to flash flash.bin... \n"
 }
 
+build_cst()
+{
+	# ===== Code Singing Tool =====
+	if [ ! -d ${CST_DIR} ] ; then
+		git clone ${CST_MIRROR} -b ${CST_BRANCH} ${CST_DIR} || printf "Fails to fetch OPTEE source code \n"
+		pushd ${CST_DIR} > /dev/null
+		git checkout ${CST_SRC_COMMIT}
+		popd > /dev/null
+	fi
+
+	if [ -d ${CST_DIR} ] ; then
+		pushd ${CST_DIR} > /dev/null
+		if [ ! -x code/cst/release/linux64/bin/cst -a ! -x code/cst/release/linux64/bin/srktool ] ; then
+			pushd code/cst > /dev/null
+			make clean OSTYPE=linux64 ENCRYPTION=yes || printf "Fails to clean CST utility\n"
+			make build OSTYPE=linux64 ENCRYPTION=yes || printf "Fails to build CST utility\n"
+			make rel_bin OSTYPE=linux64 ENCRYPTION=yes || printf "Fails to release CST utility\n"
+			popd > /dev/null
+		fi
+		if [ ! -x code/hab_csf_parser/csf_parser ]; then
+			make clean -C code/hab_csf_parser || printf "Failed to clean hab_csf_parser\n"
+			make all -C code/hab_csf_parser || printf "Failed to build hab_csf_parser\n"
+		fi
+		# install to release
+		install -m 755 code/hab_csf_parser/csf_parser code/cst/release/linux64/bin/hab_csf_parser
+		cp -rf ca code/cst/release
+		cp -rf keys code/cst/release
+		mkdir -p code/cst/release/crts
+		popd > /dev/null
+	fi
+
+	# copy release to ${BUILD_DIR}
+	if [ ! -d ${WORK_DIR}/${BUILD_DIR}/release ]; then
+		cp -rf ${CST_DIR}/code/cst/release ${WORK_DIR}/${BUILD_DIR}/
+	fi
+}
+
+generate_crts_table_fuse()
+{
+	pushd ${WORK_DIR}/${BUILD_DIR}/release > /dev/null
+	if [ -f crts/CA1_sha256_2048_65537_v3_ca_crt.pem -a \
+		-f crts/CSF1_1_sha256_2048_65537_v3_usr_crt.pem -a \
+		-f crts/CSF2_1_sha256_2048_65537_v3_usr_crt.pem -a \
+		-f crts/CSF3_1_sha256_2048_65537_v3_usr_crt.pem -a \
+		-f crts/CSF2_1_sha256_2048_65537_v3_usr_crt.pem -a \
+		-f crts/IMG1_1_sha256_2048_65537_v3_usr_crt.pem -a \
+		-f crts/IMG2_1_sha256_2048_65537_v3_usr_crt.pem -a \
+		-f crts/IMG3_1_sha256_2048_65537_v3_usr_crt.pem -a \
+		-f crts/IMG4_1_sha256_2048_65537_v3_usr_crt.pem -a \
+		-f crts/SRK1_sha256_2048_65537_v3_ca_crt.pem -a \
+		-f crts/SRK2_sha256_2048_65537_v3_ca_crt.pem -a \
+		-f crts/SRK3_sha256_2048_65537_v3_ca_crt.pem -a \
+		-f crts/SRK4_sha256_2048_65537_v3_ca_crt.pem ]; then
+		printf "Using existing generated crts\n"
+	else
+		./keys/hab4_pki_tree.sh -existing-ca n -use-ecc n -kl 2048 -duration 5 -num-srk 4 -srk-ca y 2>&1 | tee ${WORK_DIR}/${PKI_CRTS_LOG}
+	fi
+
+	if [ -f crts/table.bin -a -f crts/fuse.bin ]; then
+		printf "Using existing generated table.bin and fuse.bin\n"
+	else
+		pushd crts > /dev/null
+		../linux64/bin/srktool -h 4 -d sha256 -t table.bin -e fuse.bin -c \
+			SRK1_sha256_2048_65537_v3_ca_crt.pem, \
+			SRK2_sha256_2048_65537_v3_ca_crt.pem, \
+			SRK3_sha256_2048_65537_v3_ca_crt.pem, \
+			SRK4_sha256_2048_65537_v3_ca_crt.pem 2>&1 | tee -a ${WORK_DIR}/${PKI_CRTS_LOG}
+		popd > /dev/null
+	fi
+	popd > /dev/null
+}
+
 usage()
 {
 	echo -e "\nUsage: install_uboot_imx8.sh
@@ -310,6 +406,7 @@ usage()
 	*
 	* [-d disk-path]: specify the disk to flash u-boot binary, e.g., /dev/sdd
 	* [-b dtb_name]: specify the name of dtb, which will be included in FIT image
+	* [-s]: secure boot
 	* [-t]: target u-boot binary is without HDMI firmware
 	* [-c]: clean temporary directory
 	* [-h]: help
@@ -352,6 +449,9 @@ do
 	o)
 		OVERLAYS="$OVERLAYS $OPTARG"
 		;;
+	s)
+		SECURE_BOOT=true;
+		;;
 	t)
 		MKIMAGE_TARGET='flash_spl_uboot';
 		;;
@@ -378,5 +478,23 @@ print_settings
 build_firmware
 install_uboot_dtb
 generate_imx_boot
+
+# habv4 - sign components in flash.bin
+if ( ${SECURE_BOOT} ); then
+	if [ ! -x "${WORK_DIR}/create_hab_boot.sh" ]; then
+		echo "Cannot source create_hab_boot.sh for HABv4"
+		exit 1;
+	else
+		source ${WORK_DIR}/create_hab_boot.sh
+	fi
+
+	printf "\nGenerate Secure Boot Components\n"
+	cd ${WORK_DIR}/${BUILD_DIR}
+	build_cst
+	generate_crts_table_fuse
+	generate_csf ${SOC_TARGET}
+	sign_flash_habv4
+	generate_fuse_cmds ${SOC_TARGET}
+fi
 flash_imx_boot
 
