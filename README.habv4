@@ -1,0 +1,44 @@
+To sign your flash.bin manually, make use of install_uboot_imx8.sh script
+
+1. Build your spl/u-boot normally.
+
+1.1 git clone https://github.com/ADLINK/u-boot.git -b lf_v2022.04/sp2-imx8mp
+
+1.2 enable CONFIG_IMX_HAB and set CONFIG_LPDDR4_ALL
+
+# echo "CONFIG_IMX_HAB=y" >> configs/adlink_sp2imx8mp_defconfig
+# echo "CONFIG_LPDDR4_ALL=y" >> configs/adlink_sp2imx8mp_defconfig
+
+# make adlink_sp2imx8mp_defconfig
+# make
+
+2 run ./install_uboot_imx8.sh script to generate signed flash.bin
+
+2.1 clean the build directory
+
+# ./install_uboot_imx8.sh -c
+
+2.1 build and sign flash.bin
+
+# ./install_uboot_imx8.sh -s -b sp2imx8mp.dtb
+
+NOTE: You may need to install extra library packages to successfully build all
+      the required components. i.e. atf, optee, ddr/hdmi firmware, cst, imx-mkimage.
+
+2.2 to re-use your existing PKI keys/crts to sign flash.bin.
+
+# rm -fr build_fw_imx8/release/keys/*
+# rm -fr build_fw_imx8/release/crts/*
+# cp -fr <YOUR KEYS>/* build_fw_imx8/release/keys/
+# cp -fr <YOUR CRTS>/* build_fw_imx8/release/crts/
+
+remove the previous signed flash.bin
+
+# rm -fr build_fww_imx8/imx-mkimage
+
+then run the script again
+
+# ./install_uboot_imx8.sh -s -b sp2imx8mp.dtb
+
+The signed flash.bin is located at build_fw_imx8/imx-mkimage/iMX8M/flash.bin.signed
+
