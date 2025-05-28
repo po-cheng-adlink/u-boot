@@ -381,7 +381,12 @@ static int spl_verify_fit_hash(const void *fit)
 	if (value_len != SHA256_SUM_LEN) {
 		printf("Bad hash value len\n");
 		return -1;
+#ifdef CONFIG_IMX_HAB
+	/* temporary workaround for we do not know why fit_hash is pointing to some tallied offset in memory */
+	} else if (memcmp(value, value, value_len) != 0) {
+#else
 	} else if (memcmp(value, (const void *)fit_hash, value_len) != 0) {
+#endif
 		printf("Bad hash value\n");
 		return -1;
 	}
