@@ -48,8 +48,8 @@ FSL_MIRROR="https://www.nxp.com/lgfiles/NMG/MAD/YOCTO"
 # Secure HABv4 Boot
 #	file://0001-fix-err-msg-linking.patch
 CST_MIRROR="https://gitlab.apertis.org/pkg/imx-code-signing-tool.git"
-CST_SRC_COMMIT="e2c687a856e6670e753147aacef42d0a3c07891a"
-CST_BRANCH="apertis/v2022pre"
+CST_SRC_COMMIT="ca55059b5c9bff5ca27809c4f8d56cbdc8b9ceee"
+CST_BRANCH="debian/trixie"
 CST_DIR="imx-cst"
 CST_VER="3.3.1"
 CST_BIN="${WORK_DIR}/${BUILD_DIR}/release/linux64/bin/cst"
@@ -329,38 +329,40 @@ flash_imx_boot()
 
 build_cst()
 {
+	unset ARCH
+	unset CROSS_COMPILE
+	declare -x PATH=${PATH#\/opt\/gcc-linaro*:}
 	# ===== Code Singing Tool =====
 	if [ ! -d ${CST_DIR} ] ; then
 		git clone ${CST_MIRROR} -b ${CST_BRANCH} ${CST_DIR} || printf "Fails to fetch OPTEE source code \n"
 		pushd ${CST_DIR} > /dev/null
 		git checkout ${CST_SRC_COMMIT}
+		sed 's,curl -O,curl -L -O,g' -i Makefile
 		popd > /dev/null
 	fi
 
 	if [ -d ${CST_DIR} ] ; then
 		pushd ${CST_DIR} > /dev/null
-		if [ ! -x code/cst/release/linux64/bin/cst -a ! -x code/cst/release/linux64/bin/srktool ] ; then
-			pushd code/cst > /dev/null
+		if [ ! -x build/linux64/bin/cst -a ! -x build/linux64/bin/srktool ] ; then
 			make clean OSTYPE=linux64 ENCRYPTION=yes || printf "Fails to clean CST utility\n"
 			make build OSTYPE=linux64 ENCRYPTION=yes || printf "Fails to build CST utility\n"
-			make rel_bin OSTYPE=linux64 ENCRYPTION=yes || printf "Fails to release CST utility\n"
-			popd > /dev/null
 		fi
-		if [ ! -x code/hab_csf_parser/csf_parser ]; then
-			make clean -C code/hab_csf_parser || printf "Failed to clean hab_csf_parser\n"
-			make all -C code/hab_csf_parser || printf "Failed to build hab_csf_parser\n"
+		if [ ! -x add-ons/hab_csf_parser/csf_parser ]; then
+			make clean -C add-ons/hab_csf_parser || printf "Failed to clean hab_csf_parser\n"
+			make all -C add-ons/hab_csf_parser || printf "Failed to build hab_csf_parser\n"
+			install -m 755 add-ons/hab_csf_parser/csf_parser build/linux64/bin/hab_csf_parser
 		fi
 		# install to release
-		install -m 755 code/hab_csf_parser/csf_parser code/cst/release/linux64/bin/hab_csf_parser
-		cp -rf ca code/cst/release
-		cp -rf keys code/cst/release
-		mkdir -p code/cst/release/crts
+		cp -rf ca build/
+		cp -rf keys build/
+		mkdir -p build/crts
 		popd > /dev/null
 	fi
 
 	# copy release to ${BUILD_DIR}
 	if [ ! -d ${WORK_DIR}/${BUILD_DIR}/release ]; then
-		cp -rf ${CST_DIR}/code/cst/release ${WORK_DIR}/${BUILD_DIR}/
+		mkdir -p ${WORK_DIR}/${BUILD_DIR}/release
+		cp -rf ${CST_DIR}/build/* ${WORK_DIR}/${BUILD_DIR}/release
 	fi
 }
 
@@ -382,7 +384,7 @@ generate_crts_table_fuse()
 		-f crts/SRK4_sha256_2048_65537_v3_ca_crt.pem ]; then
 		printf "Using existing generated crts\n"
 	else
-		./keys/hab4_pki_tree.sh -existing-ca n -use-ecc n -kl 2048 -duration 5 -num-srk 4 -srk-ca y 2>&1 | tee ${WORK_DIR}/${PKI_CRTS_LOG}
+		./keys/hab4_pki_tree.sh -existing-ca n -kt rsa -kl 2048 -duration 5 -num-srk 4 -srk-ca y 2>&1 | tee ${WORK_DIR}/${PKI_CRTS_LOG}
 	fi
 
 	if [ -f crts/table.bin -a -f crts/fuse.bin ]; then
