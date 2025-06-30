@@ -10,7 +10,6 @@
 #SOC_TARGET="iMX8MM"
 #SOC_DIR="iMX8M"
 #DTBS="fsl-imx8mq-evk"
-#DTBS="pico-imx8m"
 
 WORK_DIR=`pwd`
 BUILD_DIR="build_fw_imx8"
@@ -59,6 +58,18 @@ CST_CSF_CERT="${WORK_DIR}/${BUILD_DIR}/release/crts/CSF1_1_sha256_2048_65537_v3_
 CST_IMG_CERT="${WORK_DIR}/${BUILD_DIR}/release/crts/IMG1_1_sha256_2048_65537_v3_usr_crt.pem"
 CST_SRK_TABLE="${WORK_DIR}/${BUILD_DIR}/release/crts/table.bin"
 PKI_CRTS_LOG=pki_crt_table_fuse.log
+
+# ArmSystemReady
+# edk2
+SYSTEM_READY=false
+EDK2_REPO="https://github.com/tianocore/edk2.git"
+EDK2_BRANCH="master"
+EDK2_COMMIT="b24306f15daa2ff8510b06702114724b33895d3c"
+EDK2_DIR="edk2"
+EDK2_PLATFORM_REPO="https://github.com/tianocore/edk2-platforms.git"
+EDK2_PLATFORM_BRANCH="master"
+EDK2_PLATFORM_COMMIT="c9e377b00fc086fcb5a5b41663a0149bde9bcc2e"
+EDK2_PLATFORM_DIR="edk2-platforms"
 
 setup_platform()
 {
@@ -150,7 +161,11 @@ build_atf()
 		pushd ${ATF_DIR} > /dev/null
 		if [ ! -f build/${PLATFORM}/release/bl31.bin ] ; then
 			rm -rf build
-			make PLAT=${PLATFORM} bl31 || printf "Fails to build ATF firmware\n"
+			if ( ${SYSTEM_READY} ); then
+				make PLAT=${PLATFORM} SPD=opteed bl31 || printf "Fails to build STMM ATF firmware\n"
+			else
+				make PLAT=${PLATFORM} bl31 || printf "Fails to build ATF firmware\n"
+			fi
 		fi
 		popd > /dev/null
 	fi
@@ -166,11 +181,63 @@ build_optee()
 		popd > /dev/null
 	fi
 
+	# update optee for system ready and provides BL32_AP_MM.fd from edk2-firmware build
+	if ( ${SYSTEM_READY} ); then
+
+		if [ -f ${WORK_DIR}/${BUILD_DIR}/Build/MmStandaloneRpmb/RELEASE_GCC5/FV/BL32_AP_MM.fd ]; then
+			cp -f ${WORK_DIR}/${BUILD_DIR}/Build/MmStandaloneRpmb/RELEASE_GCC5/FV/BL32_AP_MM.fd ${WORK_DIR}/${BUILD_DIR}/${OPTEE_DIR}
+		else
+			echo "BL32_AP_MM.fd not found!"
+			exit 1
+		fi
+
+		if [ -f ${OPTEE_DIR}/scripts/nxp_build.sh -a -f ${OPTEE_DIR}/BL32_AP_MM.fd ]; then
+		pushd ${OPTEE_DIR} > /dev/null
+		git checkout HEAD scripts/nxp_build.sh
+		popd > /dev/null
+		sed -E 's,CFG_WERROR=y \\,CFG_STMM_PATH=${WORK_DIR}/${BUILD_DIR}/${OPTEE_DIR}/BL32_AP_MM.fd \\\
+			CFG_RPMB_FS=y \\\
+			CFG_IMX_SNVS=n \\\
+			CFG_NXP_CAAM=n \\\
+			CFG_RPMB_WRITE_KEY=y \\\
+			CFG_RPMB_FS_DEV_ID=2 \\\
+			CFG_CORE_DYN_SHM=y \\\
+			CFG_RPMB_TESTKEY=y \\\
+			CFG_REE_FS=n \\\
+			CFG_SCTLR_ALIGNMENT_CHECK=n \\\
+			CFG_CORE_HEAP_SIZE=2097152 \\\
+			CFG_TEE_RAM_VA_SIZE=4194304 \\\
+			CFG_PREALLOC_RPC_CACHE=n \\\
+			CFG_WERROR=y \\,g' -i ${OPTEE_DIR}/scripts/nxp_build.sh
+		fi
+	fi
+
 	if [ -d ${OPTEE_DIR} ] ; then
 		pushd ${OPTEE_DIR} > /dev/null
 		if [ ! -f ./out/arm-plat-imx/core/tee-raw.bin ] ; then
 			rm -rf out
-			ARCH=arm make PLATFORM=imx-${OPTEE_PLATFORM} CFG_TEE_TA_LOG_LEVEL=0 CFG_TEE_CORE_LOG_LEVEL=0 all || printf "Fails to build OPTEE firmware\n"
+			if ( ${SYSTEM_READY} ); then
+				echo "build stmm-imx"
+				ARCH=arm make PLATFORM=imx-${OPTEE_PLATFORM} \
+					CFG_TEE_TA_LOG_LEVEL=0 \
+					CFG_TEE_CORE_LOG_LEVEL=0 \
+					CFG_STMM_PATH=${WORK_DIR}/${BUILD_DIR}/${OPTEE_DIR}/BL32_AP_MM.fd \
+					CFG_RPMB_FS=y \
+					CFG_IMX_SNVS=n \
+					CFG_NXP_CAAM=n \
+					CFG_RPMB_WRITE_KEY=y \
+					CFG_RPMB_FS_DEV_ID=2 \
+					CFG_CORE_DYN_SHM=y \
+					CFG_RPMB_TESTKEY=y \
+					CFG_REE_FS=n \
+					CFG_SCTLR_ALIGNMENT_CHECK=n \
+					CFG_CORE_HEAP_SIZE=2097152 \
+					CFG_TEE_RAM_VA_SIZE=4194304 \
+					CFG_PREALLOC_RPC_CACHE=n || printf "Fails to build OPTEE firmware\n"
+			else
+				echo "build optee"
+				ARCH=arm make PLATFORM=imx-${OPTEE_PLATFORM} CFG_TEE_TA_LOG_LEVEL=0 CFG_TEE_CORE_LOG_LEVEL=0 all || printf "Fails to build OPTEE firmware\n"
+			fi
 		fi
 		popd > /dev/null
 	fi
@@ -181,7 +248,8 @@ build_ddr_hdmi()
 	# ===== DDR and HDMI =====
 	if [ ! -d firmware-imx-${DDR_FW_VER}${DDR_FW_VER_ABBREV} ] ; then
 		if [ ! -x firmware-imx-${DDR_FW_VER}${DDR_FW_VER_ABBREV}.bin ]; then
-			wget ${FSL_MIRROR}/firmware-imx-${DDR_FW_VER}${DDR_FW_VER_ABBREV}.bin || printf "Fails to fetch DDR firmware: firmware-imx-${DDR_FW_VER}${DDR_FW_VER_ABBREV}.bin\n"
+			wget ${FSL_MIRROR}/firmware-imx-${DDR_FW_VER}${DDR_FW_VER_ABBREV}.bin || \
+			printf "Fails to fetch DDR firmware: firmware-imx-${DDR_FW_VER}${DDR_FW_VER_ABBREV}.bin\n"
 		else
 			printf "Already downloaded firmware-imx-${DDR_FW_VER}${DDR_FW_VER_ABBREV}.bin\n"
 		fi
@@ -193,6 +261,53 @@ build_ddr_hdmi()
 	fi
 }
 
+build_edk2()
+{
+	# ===== EDK2 and EDK2-platforms =====
+	if [ ! -d ${EDK2_DIR} ]; then
+		git clone ${EDK2_REPO} -b ${EDK2_BRANCH} ${EDK2_DIR} || printf "Fails to fetch EDK2 source code \n"
+		pushd ${EDK2_DIR} > /dev/null
+		git checkout ${EDK2_COMMIT}
+		git submodule init && git submodule update --init --recursive
+		popd > /dev/null
+	fi
+	if [ ! -d ${EDK2_PLATFORM_DIR} ]; then
+		git clone ${EDK2_PLATFORM_REPO} -b ${EDK2_PLATFORM_BRANCH} ${EDK2_PLATFORM_DIR} || printf "Fails to fetch EDK2-Platform source code \n"
+		pushd ${EDK2_PLATFORM_DIR} > /dev/null
+		git checkout ${EDK2_PLATFORM_COMMIT}
+		popd > /dev/null
+		if [ ! -f ${EDK2_PLATFORM_DIR}/Platform/StandaloneMm/PlatformStandaloneMmPkg/iMXStandaloneMmRpmb.dsc ]; then
+			cp -f ${WORK_DIR}/iMXStandaloneMmRpmb.dsc ${EDK2_PLATFORM_DIR}/Platform/StandaloneMm/PlatformStandaloneMmPkg/
+		fi
+	fi
+
+	# make edk2 base tool
+	export WORKSPACE=${WORK_DIR}/${BUILD_DIR}
+	export PACKAGES_PATH=${WORK_DIR}/${BUILD_DIR}/${EDK2_DIR}:${WORK_DIR}/${BUILD_DIR}/${EDK2_PLATFORM_DIR}
+	export ACTIVE_PLATFORM="Platform/StandaloneMm/PlatformStandaloneMmPkg/iMXStandaloneMmRpmb.dsc"
+	export GCC5_AARCH64_PREFIX=aarch64-linux-gnu-
+	if [ ! -d ${EDK2_DIR}/BaseTools/Source/C/bin ]; then
+		echo "Build ${EDK2_DIR}/BaseTools/Source/C/bin..."
+		source ${EDK2_DIR}/edksetup.sh
+		make -C ${EDK2_DIR}/BaseTools
+		make -C ${EDK2_DIR}/BaseTools/Source/C
+	fi
+
+	# build and copy BL32_AP_MM.fd to optee
+	if [ ! -d ./Build ]; then
+		build -p ${ACTIVE_PLATFORM} -b RELEASE -a AARCH64 -t GCC5 -n `nproc`
+		if [ ! -f ./Build/MmStandaloneRpmb/RELEASE_GCC5/FV/BL32_AP_MM.fd ]; then
+			echo "No BL32_AP_MM.fd built!"
+		fi
+	fi
+	unset WORKSPACE
+	unset CONF_PATH
+	unset EDK_TOOLS_PATH
+	unset PACKAGES_PATH
+	unset ACTIVE_PLATFORM
+	unset GCC5_AARCH64_PREFIX
+}
+
 build_firmware()
 {
 	cd ${WORK_DIR}
@@ -202,6 +317,9 @@ build_firmware()
 	fi
 	cd ${BUILD_DIR}
 
+	if ( ${SYSTEM_READY} ); then
+		build_edk2
+	fi
 	fetch_mkimage
 	build_atf
 	build_optee
@@ -215,11 +333,15 @@ build_firmware()
 		printf "Cannot find release/bl31.bin \n"
 	fi
 
-
 	# ===== collect optee =====
 	if [ -f ${OPTEE_DIR}/out/arm-plat-imx/core/tee-raw.bin ] ; then
-		printf "Copy ${OPTEE_DIR}/out/arm-plat-imx/core/tee-raw.bin to ${MKIMAGE_DIR}\n"
-		cp -f ${OPTEE_DIR}/out/arm-plat-imx/core/tee-raw.bin ${MKIMAGE_DIR}/${SOC_DIR}/tee.bin
+		if ( ${SYSTEM_READY} ); then
+			printf "Copy ${OPTEE_DIR}/out/arm-plat-imx/core/tee-raw.bin to ${MKIMAGE_DIR}/tee.bin-stmm\n"
+			cp -f ${OPTEE_DIR}/out/arm-plat-imx/core/tee-raw.bin ${MKIMAGE_DIR}/${SOC_DIR}/tee.bin-stmm
+		else
+			printf "Copy ${OPTEE_DIR}/out/arm-plat-imx/core/tee-raw.bin to ${MKIMAGE_DIR}/tee.bin\n"
+			cp -f ${OPTEE_DIR}/out/arm-plat-imx/core/tee-raw.bin ${MKIMAGE_DIR}/${SOC_DIR}/tee.bin
+		fi
 	else
 		printf "Cannot find core/tee-raw.bin \n"
 	fi
@@ -301,13 +423,40 @@ generate_imx_boot()
 	#Generate bootable binary (This binary contains SPL and u-boot.bin) for flashing
 	cd ${WORK_DIR}/${BUILD_DIR}/${MKIMAGE_DIR}
 
-	printf "\nIssue Command: make SOC=${SOC_TARGET} dtbs=\"${DTBS}\" ovlays=\"${OVERLAYS}\" ${MKIMAGE_TARGET}\n"
-	make SOC=${SOC_TARGET} dtbs="${DTBS}" ovlays="${OVERLAYS}" ${MKIMAGE_TARGET} 2>&1 | tee ${MKIMAGE_LOG} && \
-	printf "Make target: ${MKIMAGE_TARGET} and generate flash.bin... \n" || printf "Fails to generate flash.bin... \n"
+	if ( ${SYSTEM_READY} ); then
+		if [ -f ${WORK_DIR}/tools/mkeficapsule ]; then
+			cp -f ${WORK_DIR}/tools/mkeficapsule ${WORK_DIR}/${BUILD_DIR}/${MKIMAGE_DIR}/iMX8M
+		fi
+		# update "KEY_EXISTS = $(shell if ls CRT.* &> /dev/null 2>&1" line in soc.mak
+		if grep "^KEY_EXISTS = \$(shell.*" ${WORK_DIR}/${BUILD_DIR}/${MKIMAGE_DIR}/iMX8M/soc.mak; then
+			sed "s|^KEY_EXISTS.*|KEY_EXISTS=\$(sh -c 'if ls CRT\.\* \&> /dev/null 2>\&1; then echo exist; else echo noexist; fi')|g" -i ${WORK_DIR}/${BUILD_DIR}/${MKIMAGE_DIR}/iMX8M/soc.mak
+		fi
+		# update "fdtoverlay -i $(dtbs) -o $(PLAT)-evk.dtb signature.dtbo" line in soc.mak
+		if grep "fdtoverlay -i \$(PLAT)-evk.dtb -o \$(PLAT)-evk.dtb signature.dtbo$" ${WORK_DIR}/${BUILD_DIR}/${MKIMAGE_DIR}/iMX8M/soc.mak; then
+			sed 's,fdtoverlay -i \$(PLAT)-evk.dtb -o \$(PLAT)-evk.dtb signature.dtbo$,fdtoverlay -i \$(dtbs) -o \$(PLAT)-evk.dtb signature.dtbo,g' -i ${WORK_DIR}/${BUILD_DIR}/${MKIMAGE_DIR}/iMX8M/soc.mak
+		fi
+		if [ ! -f ${WORK_DIR}/${BUILD_DIR}/${MKIMAGE_DIR}/iMX8M/CRT.esl ] ; then
+			make SOC=${SOC_TARGET} dtbs="${DTBS}" ovlays="${OVERLAYS}" TEE=tee.bin-stmm capsule_key 2>&1 | tee ${MKIMAGE_LOG} &&
+			printf "Make target: capsule_key and generate capsule key... \n" || printf "Fails to generate capsule key... \n"
+		fi
+		printf "\nIssue Command: make SOC=${SOC_TARGET} dtbs=\"${DTBS}\" ovlays=\"${OVERLAYS}\" TEE=tee.bin-stmm flash_evk_stmm_capsule\n"
+		make SOC=${SOC_TARGET} dtbs="${DTBS}" ovlays="${OVERLAYS}" TEE=tee.bin-stmm flash_evk_stmm_capsule 2>&1 | tee ${MKIMAGE_LOG} && \
+		printf "Make target: ${MKIMAGE_TARGET} and generate flash.bin... \n" || printf "Fails to generate flash.bin... \n"
+	else
+		printf "\nIssue Command: make SOC=${SOC_TARGET} dtbs=\"${DTBS}\" ovlays=\"${OVERLAYS}\" ${MKIMAGE_TARGET}\n"
+		make SOC=${SOC_TARGET} dtbs="${DTBS}" ovlays="${OVERLAYS}" ${MKIMAGE_TARGET} 2>&1 | tee ${MKIMAGE_LOG} && \
+		printf "Make target: ${MKIMAGE_TARGET} and generate flash.bin... \n" || printf "Fails to generate flash.bin... \n"
+	fi
 
-	printf "\nIssue Command: make SOC=${SOC_TARGET} dtbs=\"${DTBS}\" ovlays=\"${OVERLAYS}\" print_fit_hab\n"
-	make SOC=${SOC_TARGET} dtbs="${DTBS}" ovlays="${OVERLAYS}" print_fit_hab 2>&1 | tee ${LOG_PRINT_FIT_HAB} && \
-	printf "Make target: print_fit_hab...\n" || printf "Fails to generate fit hab... \n"
+	if ( ${SYSTEM_READY} ); then
+		printf "\nIssue Command: make SOC=${SOC_TARGET} dtbs=\"${DTBS}\" ovlays=\"${OVERLAYS}\" TEE=tee.bin-stmm print_fit_hab\n"
+		make SOC=${SOC_TARGET} dtbs="${DTBS}" ovlays="${OVERLAYS}" TEE=tee.bin-stmm print_fit_hab 2>&1 | tee ${LOG_PRINT_FIT_HAB} && \
+		printf "Make target: print_fit_hab...\n" || printf "Fails to generate fit hab... \n"
+	else
+		printf "\nIssue Command: make SOC=${SOC_TARGET} dtbs=\"${DTBS}\" ovlays=\"${OVERLAYS}\" print_fit_hab\n"
+		make SOC=${SOC_TARGET} dtbs="${DTBS}" ovlays="${OVERLAYS}" print_fit_hab 2>&1 | tee ${LOG_PRINT_FIT_HAB} && \
+		printf "Make target: print_fit_hab...\n" || printf "Fails to generate fit hab... \n"
+	fi
 
 	if [ -f ${WORK_DIR}/${BUILD_DIR}/${MKIMAGE_DIR}/${SOC_DIR}/flash.bin ]; then
 		FLASH_IMAGE="${WORK_DIR}/${BUILD_DIR}/${MKIMAGE_DIR}/${SOC_DIR}/flash.bin"
@@ -411,6 +560,7 @@ usage()
 	* [-d disk-path]: specify the disk to flash u-boot binary, e.g., /dev/sdd
 	* [-b dtb_name]: specify the name of dtb, which will be included in FIT image
 	* [-s]: secure boot
+	* [-a]: arm-system-ready with stmm
 	* [-t]: target u-boot binary is without HDMI firmware
 	* [-c]: clean temporary directory
 	* [-h]: help
@@ -441,9 +591,12 @@ if [ $# -eq 0 ]; then
 	exit 1
 fi
 
-while getopts "stchd:b:o:" OPTION
+while getopts "stchad:b:o:" OPTION
 do
 	case $OPTION in
+	a)
+	    SYSTEM_READY=true;
+	    ;;
 	d)
 		DRIVE="$OPTARG"
 		;;
@@ -460,8 +613,8 @@ do
 		MKIMAGE_TARGET='flash_spl_uboot';
 		;;
 	c)
-		rm -rf ${BUILD_DIR} ${MKIMAGE_DIR}
-		echo "Clean ${BUILD_DIR} ${MKIMAGE_DIR}..."
+		rm -rf ${WORK_DIR}${BUILD_DIR}
+		echo "Clean ${BUILD_DIR}..."
 		exit
 		;;
 	?|h) usage
