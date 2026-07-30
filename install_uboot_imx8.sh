@@ -73,7 +73,7 @@ EDK2_PLATFORM_DIR="edk2-platforms"
 
 setup_platform()
 {
-	SOC=$( echo "${DTBS%%.*}" )
+	SOC=$( echo "${DTBS%%.*}" | cut -d'-' -f2 )
 	case "${SOC}" in
 	*imx8mn*)
 		OPTEE_PLATFORM="mx8mnevk"
@@ -472,15 +472,17 @@ flash_imx_boot()
 	fi
 	sudo umount ${DRIVE}?
 	sleep 0.1
-	sudo dd if=${WORK_DIR}/${BUILD_DIR}/${MKIMAGE_DIR}/${SOC_DIR}/${IMX_BOOT} of=${DRIVE} bs=1k seek=${IMX_BOOT_SEEK} oflag=dsync status=progress && \
-	printf "Flash flash.bin... \n" || printf "Fails to flash flash.bin... \n"
+	if ( ${SECURE_BOOT} ); then
+		sudo dd if=${WORK_DIR}/${BUILD_DIR}/${MKIMAGE_DIR}/${SOC_DIR}/${IMX_BOOT}.signed of=${DRIVE} bs=1k seek=${IMX_BOOT_SEEK} oflag=dsync status=progress && \
+		printf "Flash flash.bin.signed... \n" || printf "Fails to flash flash.bin.signed... \n"
+	else
+		sudo dd if=${WORK_DIR}/${BUILD_DIR}/${MKIMAGE_DIR}/${SOC_DIR}/${IMX_BOOT} of=${DRIVE} bs=1k seek=${IMX_BOOT_SEEK} oflag=dsync status=progress && \
+		printf "Flash flash.bin... \n" || printf "Fails to flash flash.bin... \n"
+	fi
 }
 
 build_cst()
 {
-	unset ARCH
-	unset CROSS_COMPILE
-	declare -x PATH=${PATH#\/opt\/gcc-linaro*:}
 	# ===== Code Singing Tool =====
 	if [ ! -d ${CST_DIR} ] ; then
 		git clone ${CST_MIRROR} -b ${CST_BRANCH} ${CST_DIR} || printf "Fails to fetch OPTEE source code \n"
@@ -490,7 +492,7 @@ build_cst()
 		popd > /dev/null
 	fi
 
-	if [ -d ${CST_DIR} ] ; then
+	if [ ! -d ${CST_DIR}/build ] ; then
 		pushd ${CST_DIR} > /dev/null
 		if [ ! -x build/linux64/bin/cst -a ! -x build/linux64/bin/srktool ] ; then
 			make clean OSTYPE=linux64 ENCRYPTION=yes || printf "Fails to clean CST utility\n"
@@ -508,9 +510,12 @@ build_cst()
 		popd > /dev/null
 	fi
 
-	# copy release to ${BUILD_DIR}
+	# create release to ${BUILD_DIR}
 	if [ ! -d ${WORK_DIR}/${BUILD_DIR}/release ]; then
-		mkdir -p ${WORK_DIR}/${BUILD_DIR}/release
+		mkdir -p ${WORK_DIR}/${BUILD_DIR}/release/
+	fi
+	if [ -x ${CST_DIR}/build/linux64/bin/cst -a ! -x ${CST_DIR}/release/linux64/bin/cst ]; then
+		# install to release
 		cp -rf ${CST_DIR}/build/* ${WORK_DIR}/${BUILD_DIR}/release
 	fi
 }
@@ -645,13 +650,23 @@ if ( ${SECURE_BOOT} ); then
 		source ${WORK_DIR}/create_hab_boot.sh
 	fi
 
-	printf "\nGenerate Secure Boot Components\n"
+	printf "\n***** Generate imx-cst *****\n"
 	cd ${WORK_DIR}/${BUILD_DIR}
-	build_cst
+	(
+		unset ARCH
+		unset CROSS_COMPILE
+		declare -x PATH=${PATH#\/opt\/gcc-linaro*:}
+		build_cst
+	)
+	printf "\n***** Generate crts fuse table *****\n"
 	generate_crts_table_fuse
+	printf "\n***** Generate csf table *****\n"
 	generate_csf ${SOC_TARGET}
+	printf "\n***** Sign flash.bin *****\n"
 	sign_flash_habv4
+	printf "\n***** Generate U-boot Fuse Command *****\n"
 	generate_fuse_cmds ${SOC_TARGET}
 fi
+printf "\n***** Flash to NXP Device *****\n"
 flash_imx_boot
 
