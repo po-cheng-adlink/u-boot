@@ -1,0 +1,13 @@
+config MSGPACK
+    bool "Enable MessagePack binary packing support for json formatted content"
+    default n
+	help
+	  MSGPACK support. This enables MSGPACK binary packing feature for json
+	  formatted content.
+
+if MSGPACK
+
+config SPL_MSGPACK
+	bool "Use MSGPACK Library within SPL"
+
+endif

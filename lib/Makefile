@@ -102,6 +102,8 @@ obj-$(CONFIG_AVB_SUPPORT) += avb/
 obj-$(CONFIG_$(PHASE_)OF_LIBFDT) += libfdt/
 obj-$(CONFIG_$(PHASE_)OF_REAL) += fdtdec_common.o fdtdec.o
 
+obj-$(CONFIG_$(SPL_)MSGPACK) += msgpack/
+
 obj-$(CONFIG_$(PHASE_)MBEDTLS_LIB) += mbedtls/
 
 obj-$(CONFIG_NET_LWIP) += lwip/
