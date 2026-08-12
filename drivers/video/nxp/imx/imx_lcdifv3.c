@@ -2,6 +2,7 @@
 /*
  * Copyright 2019 NXP
  */
+#define DEBUG
 
 #include <malloc.h>
 #include <video.h>
@@ -63,6 +64,7 @@ static int lcdifv3_set_pix_fmt(struct lcdifv3_priv *priv, unsigned int format)
 	}
 
 	writel(ctrldescl0_5,  (ulong)(priv->reg_base + LCDIFV3_CTRLDESCL0_5));
+	debug("%s() reg: 0x%lx, ctrldescl0_5: 0x%lx\n", __func__, (ulong)(priv->reg_base + LCDIFV3_CTRLDESCL0_5), ctrldescl0_5);
 
 	return 0;
 }
@@ -77,40 +79,43 @@ static void lcdifv3_set_mode(struct lcdifv3_priv *priv,
 	disp_size = DISP_SIZE_DELTA_Y(mode->yres) |
 		    DISP_SIZE_DELTA_X(mode->xres);
 	writel(disp_size, (ulong)(priv->reg_base + LCDIFV3_DISP_SIZE));
-
+	debug("%s() reg: 0x%lx, disp_size: 0x%lx\n", __func__, (ulong)(priv->reg_base + LCDIFV3_DISP_SIZE), disp_size);
 	hsyn_para = HSYN_PARA_BP_H(mode->left_margin) |
 		    HSYN_PARA_FP_H(mode->right_margin);
 	writel(hsyn_para, (ulong)(priv->reg_base + LCDIFV3_HSYN_PARA));
-
+	debug("%s() reg: 0x%lx, hsyn_para: 0x%lx\n", __func__, (ulong)(priv->reg_base + LCDIFV3_HSYN_PARA), hsyn_para);
 	vsyn_para = VSYN_PARA_BP_V(mode->upper_margin) |
 		    VSYN_PARA_FP_V(mode->lower_margin);
 	writel(vsyn_para, (ulong)(priv->reg_base + LCDIFV3_VSYN_PARA));
-
+	debug("%s() reg: 0x%lx, vsyn_para: 0x%lx\n", __func__, (ulong)(priv->reg_base + LCDIFV3_VSYN_PARA), vsyn_para);
 	vsyn_hsyn_width = VSYN_HSYN_WIDTH_PW_V(mode->vsync_len) |
 			  VSYN_HSYN_WIDTH_PW_H(mode->hsync_len);
 	writel(vsyn_hsyn_width, (ulong)(priv->reg_base + LCDIFV3_VSYN_HSYN_WIDTH));
+	debug("%s() reg: 0x%lx, vsyn_hsyn_width: 0x%lx\n", __func__, (ulong)(priv->reg_base + LCDIFV3_VSYN_HSYN_WIDTH), vsyn_hsyn_width);
 
 	/* config layer size */
 	/* TODO: 32bits alignment for width */
 	ctrldescl0_1 = CTRLDESCL0_1_HEIGHT(mode->yres) |
 		       CTRLDESCL0_1_WIDTH(mode->xres);
 	writel(ctrldescl0_1, (ulong)(priv->reg_base + LCDIFV3_CTRLDESCL0_1));
-
+	debug("%s() reg: 0x%lx, ctrldescl0_1: 0x%lx\n", __func__, (ulong)(priv->reg_base + LCDIFV3_CTRLDESCL0_1), ctrldescl0_1);
 	/* Polarities */
 	if (mode->sync & FB_SYNC_VERT_HIGH_ACT)
 		writel(CTRL_INV_VS, (ulong)(priv->reg_base + LCDIFV3_CTRL_CLR));
 	else
 		writel(CTRL_INV_VS, (ulong)(priv->reg_base + LCDIFV3_CTRL_SET));
+	debug("%s() v-polarity: 0x%lx\n", __func__, mode->sync & FB_SYNC_VERT_HIGH_ACT);
 
 	if (mode->sync & FB_SYNC_HOR_HIGH_ACT)
 		writel(CTRL_INV_HS, (ulong)(priv->reg_base + LCDIFV3_CTRL_CLR));
 	else
 		writel(CTRL_INV_HS, (ulong)(priv->reg_base + LCDIFV3_CTRL_SET));
+	debug("%s() h-polarity: 0x%lx\n", __func__, mode->sync & FB_SYNC_HOR_HIGH_ACT);
 
 	/* SEC MIPI DSI specific */
 	writel(CTRL_INV_PXCK, (ulong)(priv->reg_base + LCDIFV3_CTRL_CLR));
 	writel(CTRL_INV_DE, (ulong)(priv->reg_base + LCDIFV3_CTRL_CLR));
-
+	debug("%s() reg: 0x%lx, SEC MIPI DSI Specifics: 0x%lx\n", __func__, (ulong)(priv->reg_base + LCDIFV3_CTRL_CLR), CTRL_INV_PXCK);
 }
 
 static void lcdifv3_set_bus_fmt(struct lcdifv3_priv *priv)
@@ -127,6 +132,7 @@ static void lcdifv3_set_bus_fmt(struct lcdifv3_priv *priv)
 	disp_para &= ~DISP_PARA_DISP_MODE(3);
 	disp_para |= DISP_PARA_DISP_MODE(0);
 	writel(disp_para, (ulong)(priv->reg_base + LCDIFV3_DISP_PARA));
+	debug("%s() reg: 0x%lx, disp_para: 0x%lx\n", __func__, (ulong)(priv->reg_base + LCDIFV3_DISP_PARA), disp_para);
 }
 
 static void lcdifv3_enable_plane_panic(struct lcdifv3_priv *priv)
@@ -149,6 +155,7 @@ static void lcdifv3_enable_plane_panic(struct lcdifv3_priv *priv)
 		      PANIC0_THRES_PANIC_THRES_HIGH(thres_high);
 
 	writel(panic_thres, priv->reg_base + LCDIFV3_PANIC0_THRES);
+	debug("%s() reg: 0x%lx, panic_thres: 0x%lx\n", __func__, (ulong)(priv->reg_base + LCDIFV3_PANIC0_THRES), panic_thres);
 
 	/* Enable Panic:
 	 *
@@ -171,14 +178,17 @@ static void lcdifv3_enable_controller(struct lcdifv3_priv *priv)
 	/* disp on */
 	disp_para |= DISP_PARA_DISP_ON;
 	writel(disp_para, (ulong)(priv->reg_base + LCDIFV3_DISP_PARA));
+	debug("%s() reg: 0x%lx, disp_para(on): 0x%lx\n", __func__, (ulong)(priv->reg_base + LCDIFV3_DISP_PARA), disp_para);
 
 	/* enable shadow load */
 	ctrldescl0_5 |= CTRLDESCL0_5_SHADOW_LOAD_EN;
 	writel(ctrldescl0_5, (ulong)(priv->reg_base + LCDIFV3_CTRLDESCL0_5));
+	debug("%s() reg: 0x%lx, ctrldescl0_5(shadow): 0x%lx\n", __func__, (ulong)(priv->reg_base + LCDIFV3_CTRLDESCL0_5), ctrldescl0_5);
 
 	/* enable layer dma */
 	ctrldescl0_5 |= CTRLDESCL0_5_EN;
 	writel(ctrldescl0_5, (ulong)(priv->reg_base + LCDIFV3_CTRLDESCL0_5));
+	debug("%s() reg: 0x%lx, ctrldescl0_5(en): 0x%lx\n", __func__, (ulong)(priv->reg_base + LCDIFV3_CTRLDESCL0_5), ctrldescl0_5);
 }
 
 static void lcdifv3_disable_controller(struct lcdifv3_priv *priv)
@@ -224,10 +234,10 @@ static void lcdifv3_init(struct udevice *dev,
 
 	/* Set fb address to primary layer */
 	writel(plat->base, (ulong)(priv->reg_base + LCDIFV3_CTRLDESCL_LOW0_4));
-
+	debug("%s() reg: 0x%lx, plat->base(LCDIFV3_CTRLDESCL_LOW0_4): 0x%lx\n", __func__, (ulong)(priv->reg_base + LCDIFV3_CTRLDESCL_LOW0_4), plat->base);
 	writel(CTRLDESCL0_3_P_SIZE(1) |CTRLDESCL0_3_T_SIZE(1) | CTRLDESCL0_3_PITCH(mode->xres * 4),
 		(ulong)(priv->reg_base + LCDIFV3_CTRLDESCL0_3));
-
+	debug("%s() reg: 0x%lx, plat->base(LCDIFV3_CTRLDESCL0_3): 0x%lx\n", __func__, (ulong)(priv->reg_base + LCDIFV3_CTRLDESCL0_3), CTRLDESCL0_3_P_SIZE(1) |CTRLDESCL0_3_T_SIZE(1) | CTRLDESCL0_3_PITCH(mode->xres * 4));
 	lcdifv3_enable_controller(priv);
 }
 
@@ -263,7 +273,7 @@ static int lcdifv3_of_get_timings(struct udevice *dev,
 		return -ENODEV;
 	}
 
-	debug("disp_dev %s\n", priv->disp_dev->name);
+	debug("\n%s(): disp_dev %s\n", __func__, priv->disp_dev->name);
 
 	ret = video_link_get_display_timings(timings);
 	if (ret) {
@@ -333,7 +343,7 @@ static int lcdifv3_video_probe(struct udevice *dev)
 	u32 fb_start, fb_end;
 	int ret;
 
-	debug("%s() plat: base 0x%lx, size 0x%x\n",
+	debug("\n%s() plat: base 0x%lx, size 0x%x\n",
 	       __func__, plat->base, plat->size);
 
 	priv->reg_base = dev_read_addr(dev);
@@ -351,18 +361,19 @@ static int lcdifv3_video_probe(struct udevice *dev)
 	if (priv->disp_dev) {
 #if IS_ENABLED(CONFIG_VIDEO_BRIDGE)
 		if (device_get_uclass_id(priv->disp_dev) == UCLASS_VIDEO_BRIDGE) {
+			debug("%s() attach bridge\n", __func__);
 			ret = video_bridge_attach(priv->disp_dev);
 			if (ret) {
 				dev_err(dev, "fail to attach bridge\n");
 				return ret;
 			}
-
+			debug("%s() check bridge timing\n", __func__);
 			ret = video_bridge_check_timing(priv->disp_dev, &timings);
 			if (ret) {
 				dev_err(dev, "fail to check timing\n");
 				return ret;
 			}
-
+			debug("%s() video_bridge_set_backlight\n", __func__);
 			ret = video_bridge_set_backlight(priv->disp_dev, 80);
 			if (ret) {
 				dev_err(dev, "fail to set backlight\n");

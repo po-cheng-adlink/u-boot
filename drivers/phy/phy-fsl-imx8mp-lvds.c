@@ -3,6 +3,7 @@
 /*
  * Copyright 2023 NXP
  */
+#define DEBUG
 
 #include <asm/io.h>
 #include <dm.h>
@@ -108,6 +109,8 @@ static int imx8mp_lvds_phy_init(struct phy *phy)
 
 	priv = dev_get_priv(dev_get_parent(phy->dev));
 
+	debug("%s(): driver %s\n", __func__, priv->dev->driver->name);
+
 	phy_write(phy, priv->devdata->lvds_ctrl,
 			CC_ADJ(0x2) | PRE_EMPH_EN | PRE_EMPH_ADJ(0x3));
 
@@ -127,6 +130,8 @@ static int imx8mp_lvds_phy_power_on(struct phy *phy)
 
 	id = (ulong)dev_get_plat(phy->dev);
 	priv = dev_get_priv(dev_get_parent(phy->dev));
+
+	debug("%s(): driver %s, id:%lx\n", __func__, priv->dev->driver->name, id);
 
 	val = phy_read(phy, priv->devdata->lvds_ctrl);
 	bg_en = !!(val & BG_EN);
@@ -162,6 +167,8 @@ static int imx8mp_lvds_phy_power_off(struct phy *phy)
 	id = (ulong)dev_get_plat(phy->dev);
 	priv = dev_get_priv(dev_get_parent(phy->dev));
 
+	debug("%s(): driver %s, id:%lx\n", __func__, priv->dev->driver->name, id);
+
 	val = phy_read(phy, priv->devdata->lvds_ctrl);
 	val &= ~BG_EN;
 	phy_write(phy, priv->devdata->lvds_ctrl, val);
@@ -185,6 +192,8 @@ static int imx8mp_lvds_phy_probe(struct udevice *dev)
 {
 	struct imx8mp_lvds_phy_priv *priv = dev_get_priv(dev);
 	int ret;
+
+	debug("\n%s(): driver %s\n", __func__, dev->driver->name);
 
 	priv->devdata = (const struct imx8mp_lvds_phy_devdata *)dev_get_driver_data(dev);
 	if (!priv->devdata) /* sub phy node device, directly return */
@@ -220,6 +229,8 @@ static int imx8mp_lvds_phy_bind(struct udevice *dev)
 	u32 phy_id;
 	ulong drv_data = dev_get_driver_data(dev);
 	int ret = 0;
+
+	debug("\n%s(): driver %s\n", __func__, dev->driver->name);
 
 	if (drv_data) {
 		/* Parent lvds phy node, bind each subnode to driver */

@@ -5,6 +5,7 @@
  *   Yannick Fertre <yannick.fertre@st.com>
  * Adapted by Miquel Raynal <miquel.raynal@bootlin.com>
  */
+#define DEBUG
 
 #define LOG_CATEGORY UCLASS_VIDEO_BRIDGE
 
@@ -173,9 +174,10 @@ static int imx_ldb_check_timing(struct udevice *dev, struct display_timing *timi
 
 	ldb_rate = imx_ldb_input_rate(priv, &timings);
 	clk_set_rate(&priv->ldb_clk, ldb_rate);
+	debug("%s(): ldb: clk ldb_rate: 0x%lx\n", __func__, ldb_rate);
 
 	writel(ldb_ctrl, priv->ldb_ctrl);
-	debug("%s(): ldb: ldb_rate: 0x%lx\n", __func__, ldb_rate);
+	debug("%s(): ldb: ldb_ctrl(0x%lx): 0x%lx\n", __func__, priv->ldb_ctrl, ldb_ctrl);
 
 	return 0;
 }
@@ -191,7 +193,7 @@ static int imx_ldb_attach(struct udevice *dev)
 	lvds_ctrl = LVDS_CTRL_CC_ADJ(2) | LVDS_CTRL_PRE_EMPH_EN |
 		    LVDS_CTRL_PRE_EMPH_ADJ(3) | LVDS_CTRL_VBG_EN;
 	writel(lvds_ctrl, priv->lvds_ctrl);
-	debug("%s(): ldb: power on: lvds_ctrl: 0x%lx\n", __func__, lvds_ctrl);
+	debug("%s(): ldb: power on: lvds_ctrl(0x%lx): 0x%lx\n", __func__, priv->lvds_ctrl, lvds_ctrl);
 
 	/* Wait for VBG to stabilize. */
 	udelay(15);
@@ -202,7 +204,7 @@ static int imx_ldb_attach(struct udevice *dev)
 		lvds_ctrl |= LVDS_CTRL_CH1_EN;
 
 	writel(lvds_ctrl, priv->lvds_ctrl);
-	debug("%s(): ldb: power on(en): lvds_ctrl: 0x%lx\n", __func__, lvds_ctrl);
+	debug("%s(): ldb: power on(0x%lx): lvds_ctrl: 0x%lx\n", __func__, priv->lvds_ctrl, lvds_ctrl);
 
 	return 0;
 }
