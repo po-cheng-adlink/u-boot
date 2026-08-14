@@ -18,6 +18,17 @@
 		stdout-path = &uart2;
 	};
 
+	backlight_lvds: backlight-lvds {
+		compatible = "pwm-backlight";
+		brightness-levels = <0 100>;
+		num-interpolated-steps = <100>;
+		default-brightness-level = <80>;
+		enable-gpios = <&gpio1 0 GPIO_ACTIVE_HIGH>;
+		power-supply = <&reg_lvds_bl_pwr>;
+		pwms = <&pwm2 0 100000 0>;
+		status = "okay";
+	};
+
 	gpio-leds {
 		compatible = "gpio-leds";
 		pinctrl-names = "default";
@@ -75,6 +86,18 @@
 		regulator-always-on;
 	};
 
+	reg_lvds_bl_pwr: regulator-lvds-bl-pwr {
+		compatible = "regulator-fixed";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_bl_pwr>;
+		regulator-name = "BL_PWR";
+		regulator-max-microvolt = <1200000>;
+		regulator-min-microvolt = <1200000>;
+		gpio = <&gpio3 20 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+		regulator-always-on;
+	};
+
 	reg_usdhc2_vmmc: regulator-usdhc2 {
 		compatible = "regulator-fixed";
 		pinctrl-names = "default";
@@ -86,28 +109,68 @@
 		enable-active-high;
 	};
 
-	dsi_host: dsi-host {
-		compatible = "samsung,sec-mipi-dsi";
-		status = "okay";
-	};
+	lvds_panel_7: panel-7@0 {
+		compatible = "panel-lvds";
+		backlight = <&backlight_lvds>;
+		/* power-supply = <&pinctrl_lvds_en>; */
+		enable-gpios = <&gpio4 27 GPIO_ACTIVE_HIGH>; /* +VDD_PANEL */
+		status = "disabled";
 
-	rm67199_panel {
-		compatible = "raydium,rm67199";
-		pinctrl-names = "default";
-		pinctrl-0 = <&pinctrl_mipi_dsi_en>;
-		reset-gpio = <&gpio1 8 GPIO_ACTIVE_LOW>;
-		dsi-lanes = <4>;
-		video-mode = <2>;	/* 0: burst mode
-					 * 1: non-burst mode with sync event
-					 * 2: non-burst mode with sync pulse
-					 */
-		panel-width-mm = <68>;
-		panel-height-mm = <121>;
-		status = "okay";
+		width-mm = <154>;
+		height-mm = <86>;
+		data-mapping = "spwg";
+
+		display-timings {
+			native-mode = <&timing7>;
+			timing7: timing7 {
+				clock-frequency = <63000000>;
+				hactive = <860>;
+				vactive = <600>;
+				hfront-porch = <160>;
+				hback-porch = <160>;
+				vback-porch = <23>;
+				vfront-porch = <12>;
+				hsync-len = <1>;
+				vsync-len = <1>;
+			};
+		};
 
 		port {
-			rm67191_from_dsim: endpoint {
-				remote-endpoint = <&dsim_to_rm67191>;
+			panel_7_in: endpoint {
+				remote-endpoint = <&ldb_lvds_ch0>;
+			};
+		};
+	};
+
+	lvds_panel_10: panel-10@1 {
+		compatible = "panel-lvds";
+		backlight = <&backlight_lvds>;
+		/* power-supply = <&pinctrl_lvds_en>; */
+		enable-gpios = <&gpio4 27 GPIO_ACTIVE_HIGH>; /* +VDD_PANEL */
+		status = "okay";
+
+		width-mm = <217>;
+		height-mm = <135>;
+		data-mapping = "spwg";
+
+		display-timings {
+			native-mode = <&timing10>;
+			timing10: timing10 {
+				clock-frequency = <76600000>;
+				hactive = <1280>;
+				vactive = <800>;
+				hfront-porch = <95>;
+				hback-porch = <95>;
+				hsync-len = <10>;
+				vback-porch = <17>;
+				vfront-porch = <17>;
+				vsync-len = <2>;
+			};
+		};
+
+		port {
+			panel_10_in: endpoint {
+				remote-endpoint = <&ldb_lvds_ch1>;
 			};
 		};
 	};
@@ -157,6 +220,12 @@
 
 &A53_3 {
 	cpu-supply = <&buck2>;
+};
+
+&pwm2 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_bl_pwm2>;
+	status = "okay";
 };
 
 &eqos {
@@ -405,20 +474,6 @@
 	sda-gpios = <&gpio5 17 GPIO_ACTIVE_HIGH>;
 	status = "okay";
 
-	adv_bridge: adv7535@3d {
-		compatible = "adi,adv7535";
-		reg = <0x3d>;
-		adi,addr-cec = <0x3c>;
-		adi,dsi-lanes = <4>;
-		status = "okay";
-
-		port {
-			adv7535_from_dsim: endpoint {
-				remote-endpoint = <&dsim_to_adv7535>;
-			};
-		};
-	};
-
 	ptn5110: tcpc@50 {
 		compatible = "nxp,ptn5110";
 		pinctrl-names = "default";
@@ -514,26 +569,47 @@
 	 */
 };
 
-&lcdif1 {
+&media_blk_ctrl {
+	ldb_phy: phy-lvds {
+		compatible = "fsl,imx8mp-lvds-phy";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		gpr = <&media_blk_ctrl>;
+		clocks = <&clk IMX8MP_CLK_MEDIA_APB_ROOT>;
+		clock-names = "apb";
+		power-domains = <&pgc_mediamix>;
+		status = "okay";
+
+		ldb_phy1: port@0 {
+			reg = <0>;
+			#phy-cells = <0>;
+		};
+	};
+};
+
+&lcdif2 {
+	compatible = "fsl,imx8mp-lcdif1";
 	status = "okay";
 };
 
-&mipi_dsi {
+
+&ldb_lvds_ch0 {
+	remote-endpoint = <&panel_7_in>;
+};
+
+&ldb_lvds_ch1 {
+	remote-endpoint = <&panel_10_in>;
+};
+
+&lvds_bridge {
 	status = "okay";
 
-	ports {
-		port@1 {
-			dsim_to_adv7535: endpoint {
-				remote-endpoint = <&adv7535_from_dsim>;
-			};
-		};
+	phys = <&ldb_phy>;
+	phy-names = "ldb_phy";
+};
 
-		port@2 {
-			dsim_to_rm67191: endpoint {
-				remote-endpoint = <&rm67191_from_dsim>;
-			};
-		};
-	};
+&mu2 {
+	status = "okay";
 };
 
 &pcie_phy {
@@ -651,6 +727,24 @@
 };
 
 &iomuxc {
+	pinctrl_bl_pwr: blpwrgrp {
+		fsl,pins = <
+			MX8MP_IOMUXC_SAI5_RXC__GPIO3_IO20       0x16    /* BLPWR_12V_5V */
+		>;
+	};
+
+	pinctrl_bl_en: blengrp {
+		fsl,pins = <
+			MX8MP_IOMUXC_GPIO1_IO00__GPIO1_IO00     0x16
+		>;
+	};
+
+	pinctrl_bl_pwm2: blpwm2grp {
+		fsl,pins = <
+			MX8MP_IOMUXC_GPIO1_IO11__PWM2_OUT       0x116
+		>;
+	};
+
 	pinctrl_eqos: eqosgrp {
 		fsl,pins = <
 			MX8MP_IOMUXC_ENET_MDC__ENET_QOS_MDC				0x2
@@ -762,9 +856,9 @@
 		>;
 	};
 
-	pinctrl_mipi_dsi_en: mipidsiengrp {
+	pinctrl_lvds_en: lvdsengrp {
 		fsl,pins = <
-			MX8MP_IOMUXC_GPIO1_IO08__GPIO1_IO08	0x16
+			MX8MP_IOMUXC_SAI2_MCLK__GPIO4_IO27  0x16    /* +VDD_PANEL LS-to-3V3 */
 		>;
 	};
 
