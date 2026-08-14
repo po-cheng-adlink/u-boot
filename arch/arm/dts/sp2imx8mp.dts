@@ -604,8 +604,9 @@
 &lvds_bridge {
 	status = "okay";
 
-	phys = <&ldb_phy>;
-	phy-names = "ldb_phy";
+	/* migrated from lvds-channel */
+	fsl,data-mapping = "spwg";
+	fsl,data-width = <24>;
 };
 
 &mu2 {
