@@ -109,39 +109,6 @@
 		enable-active-high;
 	};
 
-	lvds_panel_7: panel-7@0 {
-		compatible = "panel-lvds";
-		backlight = <&backlight_lvds>;
-		/* power-supply = <&pinctrl_lvds_en>; */
-		enable-gpios = <&gpio4 27 GPIO_ACTIVE_HIGH>; /* +VDD_PANEL */
-		status = "disabled";
-
-		width-mm = <154>;
-		height-mm = <86>;
-		data-mapping = "spwg";
-
-		display-timings {
-			native-mode = <&timing7>;
-			timing7: timing7 {
-				clock-frequency = <63000000>;
-				hactive = <860>;
-				vactive = <600>;
-				hfront-porch = <160>;
-				hback-porch = <160>;
-				vback-porch = <23>;
-				vfront-porch = <12>;
-				hsync-len = <1>;
-				vsync-len = <1>;
-			};
-		};
-
-		port {
-			panel_7_in: endpoint {
-				remote-endpoint = <&ldb_lvds_ch0>;
-			};
-		};
-	};
-
 	lvds_panel_10: panel-10@1 {
 		compatible = "panel-lvds";
 		backlight = <&backlight_lvds>;
@@ -161,7 +128,7 @@
 				vactive = <800>;
 				hfront-porch = <95>;
 				hback-porch = <95>;
-				hsync-len = <10>;
+				hsync-len = <40>;
 				vback-porch = <17>;
 				vfront-porch = <17>;
 				vsync-len = <2>;
@@ -170,7 +137,7 @@
 
 		port {
 			panel_10_in: endpoint {
-				remote-endpoint = <&ldb_lvds_ch1>;
+				remote-endpoint = <&ldb_lvds_ch0>;
 			};
 		};
 	};
@@ -594,10 +561,6 @@
 
 
 &ldb_lvds_ch0 {
-	remote-endpoint = <&panel_7_in>;
-};
-
-&ldb_lvds_ch1 {
 	remote-endpoint = <&panel_10_in>;
 };
 
