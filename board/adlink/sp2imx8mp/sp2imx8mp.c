@@ -83,37 +83,6 @@ struct efi_capsule_update_info update_info = {
 
 #endif /* EFI_HAVE_CAPSULE_SUPPORT */
 
-/* Enable Reading EEPROM and msgpack to parse BOM configs */
-extern int parse_eeprom(uint8_t *buffer, char *k, char *v);
-
-int setup_configs(int i2c_bus, int chip, char* disp, char* dispsize) {
-	struct udevice *bus;
-	struct udevice *dev;
-	int ret;
-	char buffer[1024] = {0};
-
-	ret = uclass_get_device_by_seq(UCLASS_I2C, i2c_bus, &bus);
-	if (ret) {
-		printf("%s: Can't find bus\n", __func__);
-		return -EINVAL;
-	}
-	ret = dm_i2c_probe(bus, chip, 0, &dev);
-	if (ret) {
-		printf("%s: Can't find device id=0x%x\n", __func__, chip);
-		return -ENODEV;
-	}
-	ret = dm_i2c_read(dev, 0, buffer, 1024);
-	if (ret) {
-		printf("%s dm_i2c_read failed, err %d\n", __func__, ret);
-		return -EIO;
-	}
-	ret = parse_eeprom(buffer, disp, dispsize);
-	if (ret) {
-		return -ENODATA;
-	}
-	return 0;
-}
-
 int board_early_init_f(void)
 {
 	struct wdog_regs *wdog = (struct wdog_regs *)WDOG1_BASE_ADDR;
@@ -133,6 +102,68 @@ int board_early_init_f(void)
 #endif
 	return 0;
 }
+
+#if CONFIG_IS_ENABLED(OF_BOARD_FIXUP)
+/* Enable Reading EEPROM and msgpack to parse BOM configs */
+extern int parse_eeprom(uint8_t *buffer, char *k, char *v);
+
+int board_fix_fdt(void *fdt)
+{
+	char key[] = "E_disp";
+	char disp[16] = {0};
+	int ret = 0;
+	int i = 0;
+	int nodeoff;
+	const char *disabled = "disabled";
+	const char *okay = "okay";
+	static const char * dsi_nodes[] = {
+		"/soc@0/bus@32c00000/mipi_dsi@32e60000",
+		"/dsi-panel@7",
+		"/lvds-panel@7",
+		"/lvds-panel@10",
+	};
+
+	// parse eeprom for display size
+	ret = parse_eeprom(gd->spl_handoff->arch.buffer, key, disp);
+	if (ret)
+		return -ENODATA;
+
+	// Increase internal capacity to fit structural additions
+	ret  = fdt_open_into(fdt, fdt, fdt_totalsize(fdt) + 512);
+	if (ret < 0)
+		return ret;
+
+	/* update device tree */
+	for (i = 0; i < ARRAY_SIZE(dsi_nodes); i++) {
+		nodeoff = fdt_path_offset(fdt, dsi_nodes[i]);
+		if (nodeoff > 0) {
+set_status:
+			if (!strcasecmp(disp, "7d") && ( i == 0 || i == 1)) {
+				/* printf("Enable %s\n", dsi_nodes[i]); */
+				ret = fdt_setprop(fdt, nodeoff, "status", okay, strlen(okay) + 1);
+			} else if (!strcasecmp(disp, "7") && ( i == 2 )) {
+				/* printf("Enable %s\n", dsi_nodes[i]); */
+				ret = fdt_setprop(fdt, nodeoff, "status", okay, strlen(okay) + 1);
+			} else if (!strcasecmp(disp, "10") && ( i == 3 )) {
+				/* printf("Enable %s\n", dsi_nodes[i]); */
+				ret = fdt_setprop(fdt, nodeoff, "status", okay, strlen(okay) + 1);
+			} else {
+				ret = fdt_setprop(fdt, nodeoff, "status", disabled, strlen(disabled) + 1);
+			}
+			if (ret == -FDT_ERR_NOSPACE) {
+				ret = fdt_increase_size(fdt, 512);
+				if (!ret)
+					goto set_status;
+			}
+		} else {
+			/* printf("FDT Error: %s\n", fdt_strerror(nodeoff)); */
+			return ret;
+		}
+	}
+
+	return 0;
+}
+#endif
 
 #ifdef CONFIG_SPLASH_SOURCE
 static struct splash_location sp2imx8mp_splash_sdcard[] = {
