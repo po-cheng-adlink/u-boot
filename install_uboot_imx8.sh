@@ -26,6 +26,7 @@ ATF_REPO="https://github.com/nxp-imx/imx-atf.git"
 ATF_BRANCH="lf_v2.10" #branch used by imx-atf under meta-imx
 ATF_SRC_COMMIT='49143a1701d9ccd3239e3f95f3042897ca889ea8' #refer to 'imx-atf_2.10.bb' in Yocto
 ATF_DIR="imx-atf"
+ATF_REV="release"
 
 OPTEE_REPO="https://github.com/nxp-imx/imx-optee-os.git"
 OPTEE_BRANCH="lf-6.6.23_2.0.0"
@@ -157,14 +158,23 @@ build_atf()
 		popd > /dev/null
 	fi
 
+	# debug
+	if [ -n "$DEBUG" ]; then
+		if [ $DEBUG -eq 1 ]; then
+			ATF_REV=debug
+		fi
+	else
+		DEBUG=0
+	fi
+
 	if [ -d ${ATF_DIR} ] ; then
 		pushd ${ATF_DIR} > /dev/null
-		if [ ! -f build/${PLATFORM}/release/bl31.bin ] ; then
+		if [ ! -f build/${PLATFORM}/${ATF_REV}/bl31.bin ] ; then
 			rm -rf build
 			if ( ${SYSTEM_READY} ); then
-				make PLAT=${PLATFORM} SPD=opteed bl31 || printf "Fails to build STMM ATF firmware\n"
+				make PLAT=${PLATFORM} DEBUG=${DEBUG} SPD=opteed bl31 || printf "Fails to build STMM ATF firmware\n"
 			else
-				make PLAT=${PLATFORM} bl31 || printf "Fails to build ATF firmware\n"
+				make PLAT=${PLATFORM} DEBUG=${DEBUG} bl31 || printf "Fails to build ATF firmware\n"
 			fi
 		fi
 		popd > /dev/null
@@ -326,11 +336,16 @@ build_firmware()
 	build_ddr_hdmi
 
 	# ===== collect atf =====
-	if [ -f ${ATF_DIR}/build/${PLATFORM}/release/bl31.bin ] ; then
-		printf "Copy ${ATF_DIR}/build/${PLATFORM}/release/bl31.bin to ${MKIMAGE_DIR}\n"
-		cp -f ${ATF_DIR}/build/${PLATFORM}/release/bl31.bin ${MKIMAGE_DIR}/${SOC_DIR}
+	if [ -n "$DEBUG" ]; then
+		if [ ${DEBUG} -eq 1 ]; then
+			ATF_REV=debug
+		fi
+	fi
+	if [ -f ${ATF_DIR}/build/${PLATFORM}/${ATF_REV}/bl31.bin ] ; then
+		printf "Copy ${ATF_DIR}/build/${PLATFORM}/${ATF_REV}/bl31.bin to ${MKIMAGE_DIR}\n"
+		cp -f ${ATF_DIR}/build/${PLATFORM}/${ATF_REV}/bl31.bin ${MKIMAGE_DIR}/${SOC_DIR}
 	else
-		printf "Cannot find release/bl31.bin \n"
+		printf "Cannot find ${ATF_REV}/bl31.bin \n"
 	fi
 
 	# ===== collect optee =====
